@@ -1,58 +1,60 @@
-# Routine Assist v0.8
+# Routine Assist v1.3
 
-# Routine Assist v0.7
+Organizador de demandas, agenda, viagens, hotel, veículo e pendências para rotina de campo.
 
-Organizador de demandas, agenda e viagens desenvolvido em React + TypeScript + Vite, com Supabase como banco/autenticação.
+## O que mudou na v1.3
 
-## Novidades da v0.7
+### Demandas
+- O filtro **Todas | ALTA | GENEX** fica somente em **Demandas/Entrada**.
+- Os filtros de status continuam disponíveis para localizar rapidamente uma demanda.
+- Cards mantêm a identificação visual da central.
 
-- Hospedagem mais completa:
-  - reaproveita hotéis já cadastrados;
-  - telefone, endereço e observações;
-  - edição de hospedagem existente;
-  - diária ou valor total;
-  - cálculo visual de noites e total estimado;
-  - atalhos para Google Maps e Waze.
-- Veículo mais completo:
-  - acesso direto ao Forms corporativo;
-  - botão rápido “já enviei o Forms”;
-  - status solicitado/confirmado/retirado/devolvido;
-  - Localiza ou Unidas;
-  - localizador, retirada e observações.
-- Alertas configuráveis:
-  - 14, 7, 3 e 1 dia antes;
-  - preferências salvas no Supabase;
-  - sino e dashboard respeitam as preferências;
-  - notificações do navegador quando o Routine/PWA estiver ativo e autorizado.
-- Calendário:
-  - visual Mês, Semana e Agenda;
-  - compromissos de vários dias continuam sendo exibidos como faixas contínuas;
-  - botão “Hoje”.
-- Central de notificações agora abre diretamente a viagem ou demanda relacionada.
-- Dashboard ganhou destaque para compromissos do dia.
+### Agenda única e sem sobreposição
+- Agenda e Viagens não possuem mais filtro por central: **ALTA e GENEX ficam sempre visíveis juntas**.
+- O mesmo responsável não pode ter dois atendimentos ocupando a mesma data, independentemente da central.
+- A interface bloqueia conflitos e o banco ganhou um trigger de segurança para impedir sobreposição também no Supabase.
+- Se existirem conflitos antigos criados antes da v1.3, o calendário mostra um alerta para que as datas sejam ajustadas.
 
-## Atualização
+### Calendário mais informativo
+- Viagens mostram **fazendas vinculadas**, clientes e nome da viagem, em vez de exibir somente um título genérico.
+- Viagens com várias fazendas exibem os nomes de forma resumida (ex.: `Fazenda Romy + Fazenda Umbelino`).
+- Sábado e domingo possuem fundo visual diferente.
+- Feriados nacionais são consultados pela **BrasilAPI** e destacados no calendário.
+- Ao tentar agendar um atendimento em feriado nacional, o Routine mostra uma confirmação personalizada antes de salvar.
+- O resumo de uma data também informa quando ela é feriado.
 
-1. Pare a versão anterior com `Ctrl + C`.
-2. Guarde seu `.env.local` atual.
-3. Extraia esta versão em uma nova pasta.
-4. Copie seu `.env.local` para a nova pasta.
-5. Rode:
+### Viagens
+- A página ganhou uma área **“Qual viagem deseja acessar?”** com cards de todas as viagens.
+- Cada card resume central, período, fazendas, hotel e veículo.
+- Clique em uma viagem para abrir os detalhes e continuar hotel, veículo e rota.
+
+## Banco de dados
+A v1.3 exige executar:
+
+```text
+supabase/migration-v1.3.sql
+```
+
+A migration **não apaga dados**. Ela adiciona o bloqueio definitivo contra novos períodos sobrepostos para o mesmo responsável.
+
+## Atualização a partir da v1.2
+1. Preserve seu `.env.local`.
+2. No Supabase → SQL Editor, execute `supabase/migration-v1.3.sql`.
+3. Substitua os arquivos pelo conteúdo desta versão.
+4. Rode:
 
 ```bash
 npm install
+npm run build
 npm run dev
 ```
 
-## Supabase
+5. Para publicar:
 
-A v0.7 usa as tabelas já criadas pela configuração anterior. **Não é necessário rodar SQL novo** se o `setup.sql` da v0.3/v0.6 já foi aplicado com sucesso.
+```bash
+git add .
+git commit -m "feat: Routine Assist v1.3"
+git push origin main
+```
 
-## Observação sobre notificações
-
-O app já solicita permissão e emite avisos do dispositivo quando o navegador/PWA está ativo. Push totalmente em segundo plano, com o app fechado, ainda requer conectar a `push_subscriptions` a uma Edge Function/serviço de push.
-
-
-## Publicação
-
-Veja `DEPLOY-GITHUB-VERCEL.md` para publicar no GitHub, Vercel e instalar como PWA.
+A Vercel fará o deploy automaticamente se o repositório estiver conectado.

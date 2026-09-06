@@ -140,7 +140,7 @@ export function TravelSetupPanel({ appointment, onFinish }: { appointment: Appoi
   return <div className="travel-setup">
     <div className="travel-stage-head"><div><span className="eyebrow">Próximo passo</span><h3>Organizar deslocamento</h3><p>O atendimento presencial está na agenda. Agora escolha como ele entra na sua logística.</p></div></div>
     <div className="travel-choice-grid">
-      <button type="button" onClick={()=>setMode('create')}><span className="section-icon terracotta"><RouteIcon/></span><span><strong>Criar nova viagem</strong><small>Cria o período da viagem e já vincula {appointment.client}.</small></span></button>
+      <button type="button" onClick={()=>setMode('create')}><span className="section-icon terracotta"><RouteIcon/></span><span><strong>Criar nova viagem</strong><small>Cria o período da viagem e já vincula {appointment.farmName || appointment.client}.</small></span></button>
       <button type="button" onClick={()=>setMode('link')}><span className="section-icon plum"><CheckIcon/></span><span><strong>Vincular a viagem existente</strong><small>Ideal quando você vai atender mais de uma fazenda na mesma viagem.</small></span></button>
     </div>
     <div className="modal-actions travel-actions"><button className="ghost" onClick={onFinish}>Fazer isso depois</button></div>

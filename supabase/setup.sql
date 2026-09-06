@@ -92,9 +92,12 @@ create table if not exists public.demands (
   company_name_snapshot text,
   product_name_snapshot text,
   regional_snapshot text,
+  farm_name_snapshot text,
   city_snapshot text,
   state_snapshot text,
   quantity_collars integer check (quantity_collars is null or quantity_collars >= 0),
+  vpu_count integer check (vpu_count is null or vpu_count >= 0),
+  uhf_antenna_count integer check (uhf_antenna_count is null or uhf_antenna_count >= 0),
   extra_antenna_count integer check (extra_antenna_count is null or extra_antenna_count >= 0),
   raw_information text,
   notes text,
@@ -112,6 +115,7 @@ create table if not exists public.appointments (
   farm_id uuid references public.farms(id) on delete set null,
   responsible_user_id uuid not null references public.profiles(id) on delete restrict,
   title text not null,
+  farm_name_snapshot text,
   city_snapshot text,
   state_snapshot text,
   appointment_type public.appointment_type not null default 'a_definir',
@@ -523,3 +527,33 @@ create index if not exists notifications_user_idx on public.notifications(user_i
 
 -- Final: se houver uma sessão autenticada no SQL editor não é necessário fazer nada.
 -- O app chamará bootstrap_current_user() no primeiro login.
+
+-- ============================================================
+-- v1.3: bloqueio definitivo de sobreposição por responsável
+-- ============================================================
+create or replace function public.prevent_appointment_overlap()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if exists (
+    select 1 from public.appointments a
+    where a.responsible_user_id = new.responsible_user_id
+      and a.id is distinct from new.id
+      and a.starts_at <= new.ends_at
+      and a.ends_at >= new.starts_at
+  ) then
+    raise exception 'Período indisponível: já existe outro atendimento para este responsável nas datas selecionadas.'
+      using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists prevent_appointment_overlap on public.appointments;
+create trigger prevent_appointment_overlap
+before insert or update of responsible_user_id, starts_at, ends_at
+on public.appointments
+for each row execute function public.prevent_appointment_overlap();

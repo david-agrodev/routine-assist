@@ -1,10 +1,18 @@
-# Publicação — GitHub + Vercel
+# Publicação — Routine Assist v1.3
 
-## 1. Antes de enviar ao GitHub
+## 1. Atualizar o Supabase
 
-Confirme que `.env.local` está ignorado pelo Git. Ele já está listado em `.gitignore`.
+Antes de publicar a v1.3, execute no Supabase → **SQL Editor**:
 
-Teste localmente:
+```text
+supabase/migration-v1.3.sql
+```
+
+Ela adiciona o bloqueio definitivo de datas sobrepostas para o mesmo responsável e não apaga dados existentes.
+
+## 2. Testar no VSCode
+
+Preserve seu `.env.local` e rode:
 
 ```bash
 npm install
@@ -12,28 +20,23 @@ npm run build
 npm run dev
 ```
 
-## 2. Criar o repositório no GitHub
+Confirme que `.env.local` continua ignorado pelo Git.
 
-Crie um repositório chamado `routine-assist`. Como o projeto local já possui README e .gitignore, crie o repositório remoto **sem** README, licença ou .gitignore adicionais.
+## 3. Enviar ao GitHub
 
-No terminal da pasta do projeto:
+Como o repositório já existe, o fluxo normal é:
 
 ```bash
-git init
 git add .
-git commit -m "feat: Routine Assist v0.8"
-git branch -M main
-git remote add origin https://github.com/SEU-USUARIO/routine-assist.git
-git push -u origin main
+git commit -m "feat: Routine Assist v1.3"
+git push origin main
 ```
 
-Se `git init` já tiver sido executado antes, não é necessário executá-lo novamente.
+## 4. Vercel
 
-## 3. Importar o GitHub na Vercel
+O push para `main` dispara o deploy automaticamente.
 
-Na Vercel, selecione **Add New → Project → Import Git Repository** e escolha `routine-assist`.
-
-Configuração esperada:
+Configuração esperada do projeto:
 
 - Framework Preset: Vite
 - Root Directory: `./`
@@ -41,28 +44,22 @@ Configuração esperada:
 - Output Directory: `dist`
 - Install Command: `npm install`
 
-## 4. Variáveis de ambiente na Vercel
+## 5. Variáveis de ambiente
 
-Cadastre em **Project → Settings → Environment Variables**:
+Na Vercel mantenha:
 
 ```text
 VITE_SUPABASE_URL
-VITE_SUPABASE_ANON_KEY
+VITE_SUPABASE_PUBLISHABLE_KEY
 ```
 
-Use os mesmos valores do seu `.env.local`. Marque Production, Preview e Development.
+Use os mesmos valores do `.env.local`. Essas variáveis podem ser do tipo **Config**.
 
-Depois faça um novo deploy para as variáveis entrarem no build.
+Nunca coloque senha do banco, `service_role` ou outra chave privada em variável `VITE_*`.
 
-## 5. Supabase após o primeiro deploy
+## 6. URLs do Supabase
 
-Quando a Vercel fornecer a URL, por exemplo:
-
-```text
-https://routine-assist.vercel.app
-```
-
-No Supabase abra **Authentication → URL Configuration** e configure:
+Em **Authentication → URL Configuration**:
 
 ```text
 Site URL:
@@ -73,30 +70,13 @@ http://localhost:5173/**
 https://routine-assist.vercel.app/**
 ```
 
-Se depois você conectar um domínio próprio, adicione também esse domínio.
-
-## 6. Instalar como aplicativo
+## 7. Instalar como aplicativo
 
 ### Android / Chrome
-
-Abra a URL publicada e use o botão **Instalar Routine Assist** em Configurações, quando disponível. Também é possível usar o menu do Chrome → Instalar app / Adicionar à tela inicial.
+Abra a URL publicada e use **Instalar Routine Assist** em Configurações ou o menu do Chrome.
 
 ### iPhone / Safari
-
-Abra a URL no Safari → Compartilhar → **Adicionar à Tela de Início**.
+Abra a URL → Compartilhar → **Adicionar à Tela de Início**.
 
 ### Computador
-
-Chrome/Edge podem oferecer o ícone de instalação na barra de endereço. O app também mostra a instalação em Configurações quando o navegador disponibiliza o recurso.
-
-## 7. Atualizações futuras
-
-Depois da publicação inicial, o fluxo normal é:
-
-```bash
-git add .
-git commit -m "descrição da alteração"
-git push
-```
-
-O push para `main` dispara um novo deploy de produção na Vercel. Branches diferentes podem gerar Preview Deployments.
+Chrome/Edge podem oferecer a instalação na barra de endereço.

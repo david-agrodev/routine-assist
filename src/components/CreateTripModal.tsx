@@ -69,7 +69,7 @@ export function CreateTripModal({ open, onClose }: { open: boolean; onClose: () 
       <div className="modal-subhead"><div><span className="eyebrow">Atendimentos</span><h3>Vincular à viagem</h3></div><span className="selection-count">{selected.length} selecionado{selected.length===1?'':'s'}</span></div>
       <div className="appointment-picker">
         {available.length===0 && <div className="soft-note">Não há atendimentos presenciais livres para vincular. Você ainda pode criar a viagem e adicionar atendimentos depois.</div>}
-        {available.map(a=><button type="button" key={a.id} className={`appointment-choice ${selected.includes(a.id)?'selected':''}`} onClick={()=>toggleAppointment(a.id)}><span className="choice-check">{selected.includes(a.id)?<CheckIcon/>:<CalendarIcon/>}</span><span><strong>{a.client}</strong><small>{[a.city,a.state].filter(Boolean).join('/') || 'Local não informado'} • {a.start.split('-').reverse().join('/')} → {a.end.split('-').reverse().join('/')}</small></span></button>)}
+        {available.map(a=><button type="button" key={a.id} className={`appointment-choice ${selected.includes(a.id)?'selected':''}`} onClick={()=>toggleAppointment(a.id)}><span className="choice-check">{selected.includes(a.id)?<CheckIcon/>:<CalendarIcon/>}</span><span><strong>{a.farmName || a.client}</strong><small>{a.farmName ? `${a.client} • ` : ''}{[a.city,a.state].filter(Boolean).join('/') || 'Local não informado'} • {a.start.split('-').reverse().join('/')} → {a.end.split('-').reverse().join('/')}</small></span></button>)}
       </div>
       <div className="draft-note">A viagem também fica salva como rascunho se você sair desta tela.</div>
       {error&&<div className="auth-message error modal-error">{error}</div>}

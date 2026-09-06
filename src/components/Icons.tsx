@@ -18,3 +18,7 @@ export const ArrowIcon = (p:P) => <svg {...base} {...p}><path d="M5 12h14M14 7l5
 export const SettingsIcon = (p:P) => <svg {...base} {...p}><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.7-.8-1.9.9-1.9-2.1-2.1-1.9.9-1.9-.8-.7-2h-3l-.7 2-1.9.8-1.9-.9L.9 6l.9 1.9-.8 1.9-2 .7v3l2 .7.8 1.9-.9 1.9 2.1 2.1 1.9-.9 1.9.8.7 2h3l.7-2 1.9-.8 1.9.9 2.1-2.1-.9-1.9.8-1.9Z" transform="translate(2.5 -1.5) scale(.8)"/></svg>
 export const RouteIcon = (p:P) => <svg {...base} {...p}><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18c4 0 2-7 6-7h2M8 6h3"/></svg>
 export const MenuIcon = (p:P) => <svg {...base} {...p}><path d="M5 7h14M5 12h14M5 17h14"/></svg>
+export const TrashIcon = (p:P) => <svg {...base} {...p}><path d="M4.5 7h15M9 7V4.8h6V7M7 7l.7 12h8.6L17 7M10 10.5v5M14 10.5v5"/></svg>
+export const FilterIcon = (p:P) => <svg {...base} {...p}><path d="M4 6h16M7 12h10M10 18h4"/><circle cx="8" cy="6" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="12" cy="18" r="1.4"/></svg>
+export const LogoutIcon = (p:P) => <svg {...base} {...p}><path d="M10 5H6.5A2.5 2.5 0 0 0 4 7.5v9A2.5 2.5 0 0 0 6.5 19H10"/><path d="M14 8l4 4-4 4M18 12H9"/></svg>
+export const EditIcon = (p:P) => <svg {...base} {...p}><path d="m5 19 3.4-.7L18 8.7a2 2 0 0 0-2.7-2.7L5.7 15.6Z"/><path d="m13.8 7.5 2.7 2.7M5.7 15.6l2.7 2.7"/></svg>

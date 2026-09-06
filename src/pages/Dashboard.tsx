@@ -15,16 +15,18 @@ function greeting(){
 export function Dashboard() {
   const { demands, trips, appointments, loading, error, notificationPreferences } = useRoutine()
   const pending = buildPendingItems(demands,trips,notificationPreferences)
+  const linkedAppointmentIds = new Set(trips.flatMap(t => t.appointments.map(a => a.id)))
+  const standaloneAppointments = appointments.filter(a => !linkedAppointmentIds.has(a.id))
   const today = startOfDay(new Date())
   const nextTrip = trips.find(t=>parseISO(t.end)>=today) ?? trips[0]
   const activeDemands = demands.filter(d=>!['done','cancelled'].includes(d.status)).length
-  const weekAnchor = nextTrip?.start || appointments[0]?.start || new Date()
+  const weekAnchor = nextTrip?.start || standaloneAppointments[0]?.start || new Date()
   const nextDays = nextTrip ? differenceInCalendarDays(parseISO(nextTrip.start),today) : null
   const dateLabel = format(new Date(),"EEEE, d 'de' MMMM",{locale:ptBR})
   const hotelReady = nextTrip ? isHotelReady(nextTrip) : false
   const vehicleReady = nextTrip ? isVehicleReady(nextTrip) : false
   const todayIso = format(new Date(),'yyyy-MM-dd')
-  const todayAppointments = appointments.filter(a=>a.start<=todayIso && a.end>=todayIso)
+  const todayAppointments = standaloneAppointments.filter(a=>a.start<=todayIso && a.end>=todayIso)
   const todayTrips = trips.filter(t=>t.start<=todayIso && t.end>=todayIso)
 
   return <>
@@ -57,6 +59,6 @@ export function Dashboard() {
         </div>
       </section>
     </div>
-    <section className="panel calendar-panel"><div className="panel-head"><div><span className="eyebrow">Agenda</span><h2>Visão da semana</h2></div><a className="text-link" href="/calendario">Abrir calendário <ArrowIcon/></a></div>{loading && appointments.length===0 && trips.length===0 ? <div className="empty-inline">Carregando agenda...</div> : <><div className="desktop-calendar"><WeekCalendar compact trips={trips} appointments={appointments} weekStart={weekAnchor}/></div><div className="mobile-calendar"><MobileAgenda compact trips={trips} appointments={appointments} weekStart={weekAnchor}/></div></>}</section>
+    <section className="panel calendar-panel"><div className="panel-head"><div><span className="eyebrow">Agenda</span><h2>Visão da semana</h2></div><a className="text-link" href="/calendario">Abrir calendário <ArrowIcon/></a></div>{loading && appointments.length===0 && trips.length===0 ? <div className="empty-inline">Carregando agenda...</div> : <><div className="desktop-calendar"><WeekCalendar compact trips={trips} appointments={standaloneAppointments} demands={demands} weekStart={weekAnchor}/></div><div className="mobile-calendar"><MobileAgenda compact trips={trips} appointments={standaloneAppointments} demands={demands} weekStart={weekAnchor}/></div></>}</section>
   </>
 }

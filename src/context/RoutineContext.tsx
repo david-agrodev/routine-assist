@@ -5,6 +5,8 @@ import {
   checkAppointmentConflicts as checkAppointmentConflictsDb,
   createAppointmentFromDemand,
   createDemand as createDemandDb,
+  deleteDemand as deleteDemandDb,
+  deleteTrip as deleteTripDb,
   createTrip as createTripDb,
   getAppointments,
   getCompanies,
@@ -16,6 +18,8 @@ import {
   saveVehicleReservation as saveVehicleReservationDb,
   saveNotificationPreferences as saveNotificationPreferencesDb,
   updateDemand as updateDemandDb,
+  updateAppointment as updateAppointmentDb,
+  updateTrip as updateTripDb,
 } from '../services/routine'
 import type {
   AddLodgingInput,
@@ -31,6 +35,8 @@ import type {
   SaveVehicleInput,
   Trip,
   UpdateDemandInput,
+  UpdateAppointmentInput,
+  UpdateTripInput,
 } from '../types/routine'
 
 type RoutineContextValue = {
@@ -45,9 +51,13 @@ type RoutineContextValue = {
   refresh: () => Promise<void>
   createDemand: (input: CreateDemandInput) => Promise<void>
   updateDemand: (demandId: string, input: UpdateDemandInput) => Promise<void>
-  checkAppointmentConflicts: (start: string, end: string) => Promise<AppointmentConflict[]>
+  deleteDemand: (demandId: string) => Promise<void>
+  deleteTrip: (tripId: string) => Promise<void>
+  checkAppointmentConflicts: (start: string, end: string, excludeAppointmentId?: string) => Promise<AppointmentConflict[]>
   scheduleDemand: (input: CreateAppointmentInput) => Promise<Appointment>
+  updateAppointment: (input: UpdateAppointmentInput) => Promise<Appointment>
   createTrip: (input: CreateTripInput) => Promise<string>
+  updateTrip: (input: UpdateTripInput) => Promise<void>
   linkAppointmentsToTrip: (tripId: string, appointmentIds: string[]) => Promise<void>
   addLodging: (input: AddLodgingInput) => Promise<void>
   saveVehicleReservation: (input: SaveVehicleInput) => Promise<void>
@@ -105,19 +115,47 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     if (!workspaceId) throw new Error('Workspace indisponível.')
     const updated = await updateDemandDb(workspaceId, demandId, input)
     setDemands(current => current.map(d => d.id === demandId ? updated : d))
+    setAppointments(current => current.map(a => a.demandId === demandId ? { ...a, client: updated.client, farmName: updated.farmName, city: updated.city, state: updated.state } : a))
+    setTrips(current => current.map(t => ({ ...t, appointments: t.appointments.map(a => a.demandId === demandId ? { ...a, client: updated.client, farmName: updated.farmName, city: updated.city, state: updated.state } : a) })))
   }
 
-  const checkAppointmentConflicts = async (start: string, end: string) => {
+  const deleteDemand = async (demandId: string) => {
+    if (!workspaceId) throw new Error('Workspace indisponível.')
+    await deleteDemandDb(workspaceId, demandId)
+    try { window.localStorage.removeItem(`routine-assist-demand-draft:${demandId}`) } catch { /* noop */ }
+    await refresh()
+  }
+
+  const deleteTrip = async (tripId: string) => {
+    if (!workspaceId) throw new Error('Workspace indisponível.')
+    await deleteTripDb(workspaceId, tripId)
+    await refresh()
+  }
+
+  const checkAppointmentConflicts = async (start: string, end: string, excludeAppointmentId?: string) => {
     if (!user) throw new Error('Usuário indisponível.')
-    return checkAppointmentConflictsDb(user.id, start, end)
+    return checkAppointmentConflictsDb(user.id, start, end, excludeAppointmentId)
   }
 
   const scheduleDemand = async (input: CreateAppointmentInput) => {
     if (!workspaceId || !user) throw new Error('Usuário/workspace indisponível.')
+    const conflicts = await checkAppointmentConflictsDb(user.id, input.start, input.end)
+    if (conflicts.length) throw new Error('Período indisponível: já existe outro atendimento nas datas selecionadas.')
     const appointment = await createAppointmentFromDemand(workspaceId, user, input)
     setAppointments(current => [...current, appointment].sort((a,b) => a.start.localeCompare(b.start)))
-    setDemands(current => current.map(d => d.id === input.demandId ? { ...d, status: 'scheduled', nextStep: input.type === 'Presencial' ? 'Organizar viagem' : 'Atendimento agendado', city: input.city, state: input.state } : d))
+    setDemands(current => current.map(d => d.id === input.demandId ? { ...d, status: 'scheduled', nextStep: input.type === 'Presencial' ? 'Organizar viagem' : 'Atendimento agendado', farmName: input.farmName, city: input.city, state: input.state } : d))
     return appointment
+  }
+
+  const updateAppointment = async (input: UpdateAppointmentInput) => {
+    if (!workspaceId || !user) throw new Error('Usuário/workspace indisponível.')
+    const conflicts = await checkAppointmentConflictsDb(user.id, input.start, input.end, input.appointmentId)
+    if (conflicts.length) throw new Error('Período indisponível: já existe outro atendimento nas datas selecionadas.')
+    const updated = await updateAppointmentDb(workspaceId, user, input)
+    setAppointments(current => current.map(a => a.id === updated.id ? updated : a).sort((a,b) => a.start.localeCompare(b.start)))
+    setTrips(current => current.map(t => ({ ...t, appointments: t.appointments.map(a => a.id === updated.id ? updated : a), start: t.appointments.some(a => a.id === updated.id) && updated.start < t.start ? updated.start : t.start, end: t.appointments.some(a => a.id === updated.id) && updated.end > t.end ? updated.end : t.end })))
+    setDemands(current => current.map(d => d.id === input.demandId ? { ...d, status: 'scheduled', nextStep: input.type === 'Presencial' ? 'Organizar viagem' : 'Atendimento agendado' } : d))
+    return updated
   }
 
   const createTrip = async (input: CreateTripInput) => {
@@ -125,6 +163,12 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     const tripId = await createTripDb(workspaceId, user, input)
     await refresh()
     return tripId
+  }
+
+  const updateTrip = async (input: UpdateTripInput) => {
+    if (!workspaceId) throw new Error('Workspace indisponível.')
+    await updateTripDb(workspaceId, input)
+    await refresh()
   }
 
   const linkAppointmentsToTrip = async (tripId: string, appointmentIds: string[]) => {
@@ -153,8 +197,8 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(() => ({
     demands, trips, appointments, companies, hotels, notificationPreferences, loading, error, refresh,
-    createDemand, updateDemand, checkAppointmentConflicts, scheduleDemand,
-    createTrip, linkAppointmentsToTrip, addLodging, saveVehicleReservation, saveNotificationPreferences,
+    createDemand, updateDemand, deleteDemand, deleteTrip, checkAppointmentConflicts, scheduleDemand, updateAppointment,
+    createTrip, updateTrip, linkAppointmentsToTrip, addLodging, saveVehicleReservation, saveNotificationPreferences,
   }), [demands, trips, appointments, companies, hotels, notificationPreferences, loading, error, refresh])
 
   return <RoutineContext.Provider value={value}>{children}</RoutineContext.Provider>

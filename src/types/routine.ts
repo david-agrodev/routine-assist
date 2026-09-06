@@ -6,7 +6,11 @@ export type Demand = {
   company: 'Alta' | 'GENEX' | string
   product: string
   quantity?: number
+  vpuCount?: number
+  uhfAntennaCount?: number
+  extraAntennaCount?: number
   regional?: string
+  farmName?: string
   city?: string
   state?: string
   raw?: string
@@ -21,6 +25,8 @@ export type Appointment = {
   client: string
   city?: string
   state?: string
+  farmName?: string
+  clientConfirmed?: boolean
   start: string
   end: string
   type: 'Presencial' | 'Remoto' | 'A definir'
@@ -80,6 +86,12 @@ export type Trip = {
   vehicles: VehicleReservation[]
 }
 
+export type Holiday = {
+  date: string
+  name: string
+  type?: string
+}
+
 export type Company = {
   id: string
   name: string
@@ -96,17 +108,25 @@ export type CreateDemandInput = {
   client: string
   company: string
   regional?: string
+  farmName?: string
   raw?: string
   quantity?: number
+  vpuCount?: number
+  uhfAntennaCount?: number
+  extraAntennaCount?: number
 }
 
 export type UpdateDemandInput = {
   client: string
   company: string
   regional?: string
+  farmName?: string
   city?: string
   state?: string
   quantity?: number
+  vpuCount?: number
+  uhfAntennaCount?: number
+  extraAntennaCount?: number
   raw?: string
   nextStep: string
   status: DemandStatus
@@ -124,11 +144,11 @@ export type CreateAppointmentInput = {
   client: string
   city: string
   state: string
+  farmName?: string
   start: string
   end: string
   type: 'Presencial' | 'Remoto'
   clientConfirmed: boolean
-  allowConflict?: boolean
 }
 
 export type CreateTripInput = {
@@ -170,4 +190,26 @@ export type SaveVehicleInput = {
   returnAt?: string
   pickupLocation?: string
   notes?: string
+}
+
+export type UpdateAppointmentInput = {
+  appointmentId: string
+  demandId?: string
+  start: string
+  end: string
+  type: 'Presencial' | 'Remoto'
+  clientConfirmed: boolean
+  farmName?: string
+  city?: string
+  state?: string
+}
+
+export type UpdateTripInput = {
+  tripId: string
+  title: string
+  origin?: string
+  start: string
+  end: string
+  hotelRequired: boolean
+  vehicleRequired: boolean
 }

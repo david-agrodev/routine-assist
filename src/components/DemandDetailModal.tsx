@@ -1,42 +1,59 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertIcon, CalendarIcon, CheckIcon } from './Icons'
+import { AlertIcon, CalendarIcon, CheckIcon, EditIcon, LocationIcon, PlusIcon, TrashIcon } from './Icons'
 import { LocationFields } from './LocationFields'
 import { TravelSetupPanel } from './TravelSetupPanel'
+import { ConfirmActionModal } from './ConfirmActionModal'
 import { useRoutine } from '../context/RoutineContext'
-import { formatDateRange } from '../lib/format'
-import type { Appointment, AppointmentConflict, Demand, DemandStatus } from '../types/routine'
+import { formatCompanyName, formatDateRange, formatEquipmentSummary } from '../lib/format'
+import { isHotelReady, isVehicleReady } from '../lib/tripReadiness'
+import { getHolidaysInRange } from '../services/holidays'
+import type { Appointment, AppointmentConflict, Demand, DemandStatus, Holiday } from '../types/routine'
 
-const draftKey = (id: string) => `routine-assist-demand-draft:${id}`
+const draftKey = (id: string) => `routine-assist-demand-draft:${id}:v3`
 
 type Draft = {
-  tab: 'info'|'schedule'; client: string; company: string; regional: string; city: string; state: string;
-  quantity: string; raw: string; start: string; end: string; type: 'Presencial'|'Remoto'; confirmed: boolean
-}
-
-const statusLabel: Record<DemandStatus,string> = {
-  received:'Recebida', waiting_info:'Faltam informações', contact:'Pronta para combinar data',
-  scheduled:'Agendada', done:'Concluída', cancelled:'Cancelada',
+  tab: 'info'|'schedule'
+  client: string
+  company: string
+  regional: string
+  farmName: string
+  city: string
+  state: string
+  quantity: string
+  extraAntennaCount: string
+  showExtraAntenna: boolean
+  raw: string
+  start: string
+  end: string
+  type: 'Presencial'|'Remoto'
+  confirmed: boolean
 }
 
 export function DemandDetailModal({ demand, onClose }: { demand: Demand | null; onClose: () => void }) {
-  const { companies, appointments, trips, updateDemand, checkAppointmentConflicts, scheduleDemand } = useRoutine()
+  const { companies, appointments, trips, updateDemand, deleteDemand, checkAppointmentConflicts, scheduleDemand, updateAppointment } = useRoutine()
   const [tab, setTab] = useState<'info'|'schedule'>('info')
   const [client, setClient] = useState('')
-  const [company, setCompany] = useState('Alta')
+  const [company, setCompany] = useState('')
   const [regional, setRegional] = useState('')
+  const [farmName, setFarmName] = useState('')
   const [city, setCity] = useState('')
   const [state, setState] = useState('')
   const [quantity, setQuantity] = useState('')
+  const [extraAntennaCount, setExtraAntennaCount] = useState('')
+  const [showExtraAntenna, setShowExtraAntenna] = useState(false)
   const [raw, setRaw] = useState('')
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
   const [type, setType] = useState<'Presencial'|'Remoto'>('Presencial')
   const [confirmed, setConfirmed] = useState(false)
+  const [editingAppointment, setEditingAppointment] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [conflicts, setConflicts] = useState<AppointmentConflict[]>([])
   const [checked, setChecked] = useState(false)
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [holidayPrompt, setHolidayPrompt] = useState<{ holidays: Holiday[]; mode: 'create'|'edit'; unavailable?: boolean } | null>(null)
   const initializedFor = useRef<string | null>(null)
 
   const existingAppointment = useMemo(() => {
@@ -54,81 +71,182 @@ export function DemandDetailModal({ demand, onClose }: { demand: Demand | null; 
     setClient(draft?.client ?? demand.client)
     setCompany(draft?.company ?? demand.company)
     setRegional(draft?.regional ?? demand.regional ?? '')
+    setFarmName(draft?.farmName ?? demand.farmName ?? existingAppointment?.farmName ?? '')
     setCity(draft?.city ?? demand.city ?? '')
     setState(draft?.state ?? demand.state ?? '')
     setQuantity(draft?.quantity ?? (demand.quantity == null ? '' : String(demand.quantity)))
+    setExtraAntennaCount(draft?.extraAntennaCount ?? (demand.extraAntennaCount == null ? '' : String(demand.extraAntennaCount)))
+    setShowExtraAntenna(draft?.showExtraAntenna ?? ((demand.extraAntennaCount ?? 0) > 0))
     setRaw(draft?.raw ?? demand.raw ?? '')
     setStart(draft?.start ?? existingAppointment?.start ?? '')
     setEnd(draft?.end ?? existingAppointment?.end ?? '')
     setType(draft?.type ?? (existingAppointment?.type === 'Remoto' ? 'Remoto' : 'Presencial'))
-    setConfirmed(draft?.confirmed ?? Boolean(existingAppointment))
-    setConflicts([]); setChecked(false); setError(null); setCreatedAppointment(null)
+    setConfirmed(draft?.confirmed ?? Boolean(existingAppointment?.clientConfirmed ?? existingAppointment))
+    setConflicts([]); setChecked(false); setError(null); setCreatedAppointment(null); setDeleteOpen(false); setEditingAppointment(false)
     initializedFor.current = demand.id
-  }, [demand?.id])
+  }, [demand?.id, existingAppointment?.id])
 
   useEffect(() => {
     if (!demand || initializedFor.current !== demand.id || appointment) return
-    const draft: Draft = { tab, client, company, regional, city, state, quantity, raw, start, end, type, confirmed }
+    const draft: Draft = { tab, client, company, regional, farmName, city, state, quantity, extraAntennaCount, showExtraAntenna, raw, start, end, type, confirmed }
     try { window.localStorage.setItem(draftKey(demand.id), JSON.stringify(draft)) } catch { /* persistência opcional */ }
-  }, [demand, appointment, tab, client, company, regional, city, state, quantity, raw, start, end, type, confirmed])
+  }, [demand, appointment, tab, client, company, regional, farmName, city, state, quantity, extraAntennaCount, showExtraAntenna, raw, start, end, type, confirmed])
 
-  const incomplete = useMemo(() => [!city.trim() && 'cidade', !state.trim() && 'UF', !regional.trim() && 'regional/comercial'].filter(Boolean) as string[], [city,state,regional])
   if (!demand) return null
 
   const infoComplete = Boolean(city.trim() && state.trim())
-  const isScheduled = Boolean(appointment) || demand.status === 'scheduled'
+  const isScheduled = Boolean(appointment)
   const tripComplete = Boolean(linkedTrip) || (appointment?.type === 'Remoto')
-  const autoStatus: DemandStatus = ['done','cancelled'].includes(demand.status)
-    ? demand.status
-    : isScheduled ? 'scheduled' : infoComplete ? 'contact' : 'waiting_info'
-  const autoNextStep = linkedTrip
-    ? 'Organizar hotel e veículo'
-    : appointment?.type === 'Remoto' ? 'Atendimento agendado'
-    : isScheduled ? 'Organizar viagem'
-    : infoComplete ? 'Combinar data com o cliente'
-    : 'Completar informações'
+  const hotelReady = linkedTrip ? isHotelReady(linkedTrip) : false
+  const vehicleReady = linkedTrip ? isVehicleReady(linkedTrip) : false
+  const logisticsReady = Boolean(linkedTrip && hotelReady && vehicleReady)
 
+  let autoStatusText = 'Informações pendentes'
+  if (demand.status === 'cancelled') autoStatusText = 'Cancelada'
+  else if (linkedTrip) autoStatusText = logisticsReady ? 'Viagem pronta' : 'Logística pendente'
+  else if (appointment?.type === 'Remoto') autoStatusText = 'Atendimento remoto agendado'
+  else if (appointment) autoStatusText = 'Agendada • organizar viagem'
+  else if (infoComplete) autoStatusText = 'Pronta para agendar'
+
+  const autoNextStep = linkedTrip
+    ? logisticsReady ? 'Acompanhar a viagem' : 'Organizar hotel e veículo'
+    : appointment?.type === 'Remoto' ? 'Acompanhar atendimento remoto'
+    : appointment ? 'Organizar viagem'
+    : infoComplete ? 'Combinar data com o cliente'
+    : 'Completar cidade e UF'
+
+  const storedStatus: DemandStatus = demand.status === 'cancelled'
+    ? 'cancelled'
+    : isScheduled ? 'scheduled' : infoComplete ? 'contact' : 'waiting_info'
+
+  const incomplete = [!city.trim() && 'cidade', !state.trim() && 'UF'].filter(Boolean) as string[]
+  const n = (value: string) => value === '' ? undefined : Number(value)
   const payload = (forcedStatus?: DemandStatus, forcedNext?: string) => ({
-    client: client.trim(), company, regional: regional.trim() || undefined,
-    city: city.trim() || undefined, state: state.trim().toUpperCase() || undefined,
-    quantity: quantity ? Number(quantity) : undefined, raw: raw.trim() || undefined,
-    nextStep: forcedNext || autoNextStep, status: forcedStatus || autoStatus,
+    client: client.trim(),
+    company,
+    regional: regional.trim() || undefined,
+    farmName: farmName.trim() || undefined,
+    city: city.trim() || undefined,
+    state: state.trim().toUpperCase() || undefined,
+    quantity: n(quantity),
+    extraAntennaCount: showExtraAntenna ? n(extraAntennaCount) : undefined,
+    raw: raw.trim() || undefined,
+    nextStep: forcedNext || autoNextStep,
+    status: forcedStatus || storedStatus,
   })
 
   const save = async () => {
-    if (!client.trim() || busy) return
+    if (!client.trim() || !company || busy) return
     setBusy(true); setError(null)
     try { await updateDemand(demand.id, payload()) }
     catch (e:any) { setError(e?.message || 'Não foi possível salvar a demanda.') }
     finally { setBusy(false) }
   }
 
-  const verify = async () => {
-    setError(null); setConflicts([]); setChecked(false)
-    if (!client.trim() || !city.trim() || !state.trim() || !start || !end) {
-      setError('Preencha cliente, cidade, UF e o período antes de agendar.')
+  const removeDemand = async () => {
+    if (busy) return
+    setBusy(true); setError(null)
+    try {
+      await deleteDemand(demand.id)
+      setDeleteOpen(false)
+      onClose()
+    } catch (e:any) { setError(e?.message || 'Não foi possível excluir a demanda.') }
+    finally { setBusy(false) }
+  }
+
+  const validateSchedule = () => {
+    if (!client.trim() || !city.trim() || !state.trim() || !start || !end) return 'Informe cidade e UF na aba Informações e preencha o período antes de agendar.'
+    if (type === 'Presencial' && !farmName.trim()) return 'Informe o nome da fazenda na aba Informações antes de agendar um atendimento presencial.'
+    if (end < start) return 'A data final não pode ser anterior à data inicial.'
+    if (!confirmed) return 'Confirme que a data já foi combinada com o cliente.'
+    if (linkedTrip && type === 'Remoto') return 'Este atendimento está vinculado a uma viagem. Exclua/desvincule a viagem antes de mudar o atendimento para remoto.'
+    return null
+  }
+
+  const continueAfterAvailability = async (mode: 'create'|'edit') => {
+    try {
+      const holidays = await getHolidaysInRange(start, end)
+      if (holidays.length > 0) {
+        setHolidayPrompt({ holidays, mode })
+        return
+      }
+    } catch {
+      setHolidayPrompt({ holidays: [], mode, unavailable: true })
       return
     }
-    if (end < start) { setError('A data final não pode ser anterior à data inicial.'); return }
-    if (!confirmed) { setError('Confirme que a data já foi combinada com o cliente.'); return }
+    if (mode === 'edit') await saveExisting()
+    else await createSchedule()
+  }
+
+  const verifyNew = async () => {
+    setError(null); setConflicts([]); setChecked(false)
+    const validation = validateSchedule()
+    if (validation) { setError(validation); return }
     setBusy(true)
     try {
       await updateDemand(demand.id, payload('contact', 'Data confirmada; verificar agenda'))
       const found = await checkAppointmentConflicts(start, end)
       setConflicts(found); setChecked(true)
-      if (found.length === 0) await createSchedule(false)
+      if (found.length === 0) await continueAfterAvailability('create')
     } catch (e:any) { setError(e?.message || 'Não foi possível verificar a agenda.') }
     finally { setBusy(false) }
   }
 
-  const createSchedule = async (allowConflict: boolean) => {
+  const createSchedule = async () => {
     setBusy(true); setError(null)
     try {
-      const created = await scheduleDemand({ demandId: demand.id, client: client.trim(), city: city.trim(), state: state.trim().toUpperCase(), start, end, type, clientConfirmed: confirmed, allowConflict })
+      const created = await scheduleDemand({
+        demandId: demand.id,
+        client: client.trim(),
+        city: city.trim(),
+        state: state.trim().toUpperCase(),
+        farmName: farmName.trim() || undefined,
+        start,
+        end,
+        type,
+        clientConfirmed: confirmed,
+      })
       setCreatedAppointment(created)
       setConflicts([]); setChecked(false)
       try { window.localStorage.removeItem(draftKey(demand.id)) } catch { /* noop */ }
     } catch (e:any) { setError(e?.message || 'Não foi possível agendar o atendimento.') }
+    finally { setBusy(false) }
+  }
+
+  const beginAppointmentEdit = () => {
+    if (!appointment) return
+    setStart(appointment.start); setEnd(appointment.end); setType(appointment.type === 'Remoto' ? 'Remoto' : 'Presencial')
+    setConfirmed(Boolean(appointment.clientConfirmed ?? true)); setConflicts([]); setChecked(false); setError(null); setEditingAppointment(true)
+  }
+
+  const verifyExisting = async () => {
+    if (!appointment) return
+    setError(null); setConflicts([]); setChecked(false)
+    const validation = validateSchedule()
+    if (validation) { setError(validation); return }
+    setBusy(true)
+    try {
+      const found = await checkAppointmentConflicts(start, end, appointment.id)
+      setConflicts(found); setChecked(true)
+      if (found.length === 0) await continueAfterAvailability('edit')
+    } catch(e:any){ setError(e?.message || 'Não foi possível verificar a agenda.') }
+    finally { setBusy(false) }
+  }
+
+  const saveExisting = async () => {
+    if (!appointment) return
+    setBusy(true); setError(null)
+    try {
+      const updated = await updateAppointment({
+        appointmentId: appointment.id,
+        demandId: demand.id,
+        start,end,type,clientConfirmed:confirmed,
+        farmName:farmName.trim() || undefined,
+        city:city.trim() || undefined,
+        state:state.trim().toUpperCase() || undefined,
+      })
+      setCreatedAppointment(updated); setEditingAppointment(false); setConflicts([]); setChecked(false)
+    } catch(e:any){ setError(e?.message || 'Não foi possível atualizar o agendamento.') }
     finally { setBusy(false) }
   }
 
@@ -138,64 +256,113 @@ export function DemandDetailModal({ demand, onClose }: { demand: Demand | null; 
     { label:'Agenda', done:isScheduled },
     { label: appointment?.type === 'Remoto' ? 'Sem viagem' : 'Viagem', done:tripComplete },
   ]
+  const companyOptions = companies.length ? companies : [{ id:'alta', name:'Alta' }, { id:'genex', name:'GENEX' }]
+  const deleteDetail = linkedTrip
+    ? `O compromisso será removido da Agenda e desvinculado de “${linkedTrip.title}”. A viagem continuará existindo.`
+    : appointment ? 'O compromisso também será removido da Agenda.' : 'Esta ação remove somente a demanda cadastrada.'
 
-  return <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && !busy && onClose()}>
-    <section className="modal-card demand-detail-card">
-      <div className="modal-head"><div><span className="eyebrow">Demanda</span><h2>{demand.client}</h2></div><button className="close" onClick={onClose}>×</button></div>
+  const scheduleEditor = (isEdit:boolean) => <>
+    <div className="schedule-intro"><span className="section-icon plum"><CalendarIcon/></span><div><strong>{isEdit ? 'Editar compromisso da agenda' : 'Transformar em compromisso de agenda'}</strong><p>Cidade, UF e fazenda vêm da aba Informações. Aqui você controla apenas tipo e período.</p></div></div>
+    <div className={`schedule-location ${infoComplete?'ready':'missing'}`}>
+      <span className="section-icon neutral"><LocationIcon/></span>
+      <div className="grow"><span className="eyebrow">Local do atendimento</span><strong>{infoComplete ? `${farmName ? `${farmName} • ` : ''}${city}/${state}` : 'Cidade/UF ainda não informadas'}</strong><small>{infoComplete ? 'Para alterar local ou fazenda, volte à aba Informações.' : 'Preencha o local na aba Informações antes de agendar.'}</small></div>
+      <button className="secondary mini" onClick={()=>setTab('info')}>{infoComplete?'Alterar informações':'Preencher local'}</button>
+    </div>
+    {type==='Presencial' && !farmName.trim() && <div className="soft-note"><AlertIcon/> Para atendimento presencial, informe o nome da fazenda na aba Informações.</div>}
+    <div className="form-grid schedule-grid schedule-grid-no-location">
+      <label className="field"><span>Tipo *</span><select value={type} onChange={e=>setType(e.target.value as 'Presencial'|'Remoto')}><option>Presencial</option><option>Remoto</option></select></label>
+      <label className="field"><span>Data inicial *</span><input type="date" value={start} onChange={e=>{setStart(e.target.value);setChecked(false);setConflicts([])}}/></label>
+      <label className="field"><span>Data final *</span><input type="date" value={end} onChange={e=>{setEnd(e.target.value);setChecked(false);setConflicts([])}}/></label>
+    </div>
+    <label className="confirm-row"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/><span><strong>Data confirmada com o cliente</strong><small>O Routine só salva o compromisso depois desta confirmação.</small></span></label>
+    {isEdit && linkedTrip && <div className="soft-note"><EditIcon/> Se o novo período ultrapassar a viagem, o Routine amplia a viagem automaticamente. Para encurtar saída/retorno, edite a viagem depois.</div>}
+    {!isEdit && <div className="draft-note">Data e opções ficam salvas mesmo se você fechar a demanda e voltar depois.</div>}
+    {conflicts.length>0 && <div className="conflict-box hard-block"><div className="conflict-title"><AlertIcon/><div><strong>Período indisponível</strong><span>Já existe atendimento neste período. O Routine não permite sobreposição de agenda.</span></div></div>{conflicts.map(c=><div className="conflict-row" key={c.id}><strong>{c.title}</strong><span>{formatDateRange(c.start,c.end)}</span></div>)}</div>}
+    {checked && conflicts.length===0 && <div className="auth-message success"><CheckIcon/> Agenda disponível.</div>}
+    {error && <div className="auth-message error modal-error">{error}</div>}
+    <div className="modal-actions">
+      {isEdit ? <button className="ghost" onClick={()=>{setEditingAppointment(false);setConflicts([]);setError(null)}}>Cancelar edição</button> : <button className="ghost" onClick={()=>setTab('info')}>Voltar</button>}
+      {conflicts.length>0 ? <button className="primary" onClick={()=>{setConflicts([]);setChecked(false)}}>Escolher outra data</button> : <button className="primary" disabled={busy || !infoComplete || (type==='Presencial' && !farmName.trim())} onClick={()=>void (isEdit ? verifyExisting() : verifyNew())}><CalendarIcon/> {busy?'Verificando...':isEdit?'Verificar e salvar':'Verificar e agendar'}</button>}
+    </div>
+  </>
 
-      <div className="workflow-progress" aria-label="Progresso da demanda">
-        {workflow.map((step,index)=><div key={step.label} className={`workflow-step ${step.done?'done':''}`}><span>{step.done?<CheckIcon/>:index+1}</span><small>{step.label}</small></div>)}
-      </div>
+  return <>
+    <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && !busy && onClose()}>
+      <section className="modal-card demand-detail-card">
+        <div className="modal-head"><div><span className="eyebrow">Demanda</span><h2>{demand.client}</h2></div><button className="close" onClick={onClose}>×</button></div>
 
-      <div className="detail-tabs">
-        <button className={tab==='info'?'active':''} onClick={()=>setTab('info')}>Informações</button>
-        <button className={tab==='schedule'?'active':''} onClick={()=>setTab('schedule')}><CalendarIcon/> Agenda e viagem</button>
-      </div>
-
-      {tab==='info' ? <>
-        <div className="auto-status-panel">
-          <div><span className="eyebrow">Situação automática</span><strong>{statusLabel[autoStatus]}</strong></div>
-          <div><span className="eyebrow">Próximo passo</span><strong>{autoNextStep}</strong></div>
-          <p>Você não precisa mais escolher o status. O Routine atualiza conforme as informações, o agendamento e a viagem.</p>
+        <div className="workflow-progress" aria-label="Progresso da demanda">
+          {workflow.map((step,index)=><div key={step.label} className={`workflow-step ${step.done?'done':''}`}><span>{step.done?<CheckIcon/>:index+1}</span><small>{step.label}</small></div>)}
         </div>
-        <div className="form-grid demand-edit-grid simplified-demand-grid">
-          <label className="field"><span>Cliente *</span><input value={client} onChange={e=>setClient(e.target.value)}/></label>
-          <label className="field"><span>Central *</span><select value={company} onChange={e=>setCompany(e.target.value)}>{(companies.length?companies:[{id:'alta',name:'Alta'},{id:'genex',name:'GENEX'}]).map(c=><option key={c.id} value={c.name}>{c.name}</option>)}</select></label>
-          <label className="field"><span>Colares</span><input type="number" min="0" value={quantity} onChange={e=>setQuantity(e.target.value)}/></label>
-          <label className="field"><span>Regional / comercial</span><input value={regional} onChange={e=>setRegional(e.target.value)} placeholder="Nome do regional/distrital"/></label>
-          <LocationFields city={city} state={state} onCityChange={setCity} onStateChange={setState}/>
+
+        <div className="detail-tabs">
+          <button className={tab==='info'?'active':''} onClick={()=>setTab('info')}>Informações</button>
+          <button className={tab==='schedule'?'active':''} onClick={()=>setTab('schedule')}><CalendarIcon/> Agenda e viagem</button>
         </div>
-        <label className="field"><span>Informações recebidas / observações</span><textarea rows={5} value={raw} onChange={e=>setRaw(e.target.value)}/></label>
-        {incomplete.length>0 && <div className="soft-note"><AlertIcon/> Ainda falta {incomplete.join(', ')}. Você pode salvar mesmo assim.</div>}
-        <div className="draft-note">Rascunho salvo automaticamente neste dispositivo.</div>
-        {error && <div className="auth-message error modal-error">{error}</div>}
-        <div className="modal-actions"><button className="ghost" onClick={onClose}>Fechar</button>{!isScheduled && infoComplete && <button className="secondary" onClick={()=>setTab('schedule')}><CalendarIcon/> Ir para agendamento</button>}<button className="primary" disabled={!client.trim()||busy} onClick={()=>void save()}>{busy?'Salvando...':'Salvar alterações'}</button></div>
-      </> : <>
-        {appointment ? <>
-          <div className="scheduled-summary">
-            <span className="section-icon neutral"><CheckIcon/></span>
-            <div className="grow"><span className="eyebrow">Atendimento agendado</span><h3>{appointment.client}</h3><p>{[appointment.city,appointment.state].filter(Boolean).join('/')} • {formatDateRange(appointment.start,appointment.end)} • {appointment.type}</p></div>
+
+        {tab==='info' ? <>
+          <div className="auto-status-panel">
+            <div><span className="eyebrow">Situação automática</span><strong>{autoStatusText}</strong></div>
+            <div><span className="eyebrow">Próximo passo</span><strong>{autoNextStep}</strong></div>
+            <p>O Routine atualiza o estágio conforme informações, agendamento, viagem, hotel e veículo.</p>
           </div>
-          {appointment.type === 'Presencial' ? <TravelSetupPanel appointment={appointment} onFinish={onClose}/> : <div className="remote-success"><CheckIcon/><div><strong>Pronto.</strong><span>Como o atendimento é remoto, não é necessário criar viagem, hotel ou veículo.</span></div></div>}
-        </> : demand.status==='scheduled' ? <div className="scheduled-note"><CheckIcon/><div><strong>Esta demanda está marcada como agendada.</strong><span>Atualize a página caso o compromisso ainda não tenha aparecido. O Routine usa o compromisso da Agenda para organizar a viagem.</span></div></div> : <>
-          <div className="schedule-intro"><span className="section-icon plum"><CalendarIcon/></span><div><strong>Transformar em compromisso de agenda</strong><p>Primeiro confirme a data com o cliente. Depois o Routine verifica conflitos e conduz você para a viagem.</p></div></div>
-          <div className="form-grid schedule-grid">
-            <LocationFields city={city} state={state} onCityChange={setCity} onStateChange={setState} required/>
-            <label className="field"><span>Tipo *</span><select value={type} onChange={e=>setType(e.target.value as 'Presencial'|'Remoto')}><option>Presencial</option><option>Remoto</option></select></label>
-            <label className="field"><span>Data inicial *</span><input type="date" value={start} onChange={e=>{setStart(e.target.value);setChecked(false);setConflicts([])}}/></label>
-            <label className="field"><span>Data final *</span><input type="date" value={end} onChange={e=>{setEnd(e.target.value);setChecked(false);setConflicts([])}}/></label>
+
+          <div className="form-grid simplified-demand-grid">
+            <label className="field"><span>Cliente *</span><input value={client} onChange={e=>setClient(e.target.value)} placeholder="Nome do cliente"/></label>
+            <label className="field"><span>Central *</span><select value={company} onChange={e=>setCompany(e.target.value)}><option value="">Selecione</option>{companyOptions.map(c=><option key={c.id} value={c.name}>{formatCompanyName(c.name)}</option>)}</select></label>
+            <label className="field"><span>Responsável comercial</span><input value={regional} onChange={e=>setRegional(e.target.value)} placeholder="Vendedor, regional ou distrital"/></label>
+            <label className="field"><span>Fazenda</span><input value={farmName} onChange={e=>setFarmName(e.target.value)} placeholder="Obrigatória antes do atendimento presencial"/></label>
           </div>
-          <label className="confirm-row"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/><span><strong>Data confirmada com o cliente</strong><small>O Routine só cria o compromisso depois desta confirmação.</small></span></label>
-          <div className="draft-note">Data e opções ficam salvas mesmo se você fechar a demanda e voltar depois.</div>
-          {conflicts.length>0 && <div className="conflict-box"><div className="conflict-title"><AlertIcon/><div><strong>Conflito de agenda</strong><span>Você já possui compromisso nesse período.</span></div></div>{conflicts.map(c=><div className="conflict-row" key={c.id}><strong>{c.title}</strong><span>{formatDateRange(c.start,c.end)}</span></div>)}</div>}
-          {checked && conflicts.length===0 && <div className="auth-message success"><CheckIcon/> Agenda disponível.</div>}
+          <div className="location-grid"><LocationFields state={state} city={city} onStateChange={setState} onCityChange={setCity}/></div>
+
+          <div className="equipment-panel demand-items-panel">
+            <div className="equipment-head"><div><strong>Itens desta demanda</strong><span>{formatEquipmentSummary({quantity:n(quantity),extraAntennaCount:showExtraAntenna?n(extraAntennaCount):undefined})}</span></div><small>Preencha apenas o que foi vendido nesta demanda.</small></div>
+            <div className="demand-items-grid">
+              <label className="field"><span>Colares</span><input type="number" min="0" inputMode="numeric" value={quantity} onChange={e=>setQuantity(e.target.value)} placeholder="Ex.: 300"/></label>
+              {showExtraAntenna ? <label className="field optional-demand-item"><span>Antenas adicionais</span><div className="inline-input-action"><input type="number" min="0" inputMode="numeric" value={extraAntennaCount} onChange={e=>setExtraAntennaCount(e.target.value)} placeholder="Ex.: 1"/><button type="button" className="icon-button subtle remove-item" aria-label="Remover antenas adicionais" onClick={()=>{setShowExtraAntenna(false);setExtraAntennaCount('')}}><TrashIcon/></button></div></label> : <button type="button" className="add-optional-item" onClick={()=>setShowExtraAntenna(true)}><PlusIcon/> Adicionar antenas adicionais</button>}
+            </div>
+          </div>
+
+          <label className="field raw-information-field"><span>Informações recebidas / observações</span><textarea rows={4} value={raw} onChange={e=>setRaw(e.target.value)} placeholder="Cole ou escreva aqui as informações recebidas sobre esta demanda..."/></label>
+          {incomplete.length>0 && <div className="soft-note"><AlertIcon/> Ainda falta {incomplete.join(' e ')}. Você pode salvar mesmo assim.</div>}
+          <div className="draft-note">Rascunho salvo automaticamente neste dispositivo.</div>
           {error && <div className="auth-message error modal-error">{error}</div>}
-          <div className="modal-actions">
-            <button className="ghost" onClick={()=>setTab('info')}>Voltar</button>
-            {conflicts.length>0 ? <><button className="secondary" onClick={()=>{setConflicts([]);setChecked(false)}}>Alterar data</button><button className="danger-soft" disabled={busy} onClick={()=>void createSchedule(true)}>Agendar mesmo assim</button></> : <button className="primary" disabled={busy} onClick={()=>void verify()}><CalendarIcon/> {busy?'Verificando...':'Verificar e agendar'}</button>}
-          </div>
+          <div className="modal-actions demand-actions"><button className="danger-outline" disabled={busy} onClick={()=>{setError(null);setDeleteOpen(true)}}><TrashIcon/> Excluir demanda</button><span className="actions-spacer"/><button className="ghost" onClick={onClose}>Fechar</button>{!isScheduled && infoComplete && <button className="secondary" onClick={()=>setTab('schedule')}><CalendarIcon/> Ir para agendamento</button>}<button className="primary" disabled={!client.trim()||!company||busy} onClick={()=>void save()}>{busy?'Salvando...':'Salvar alterações'}</button></div>
+        </> : <>
+          {appointment && !editingAppointment ? <>
+            <div className="scheduled-summary">
+              <span className="section-icon neutral"><CheckIcon/></span>
+              <div className="grow"><span className="eyebrow">Atendimento agendado</span><h3>{appointment.farmName || appointment.client}</h3><p>{appointment.client}{appointment.farmName ? ' • ' : ''}{[appointment.city,appointment.state].filter(Boolean).join('/')} • {formatDateRange(appointment.start,appointment.end)} • {appointment.type}</p></div>
+              <button className="secondary compact" onClick={beginAppointmentEdit}><EditIcon/> Editar agendamento</button>
+            </div>
+            {appointment.type === 'Presencial' ? <TravelSetupPanel appointment={appointment} onFinish={onClose}/> : <div className="remote-success"><CheckIcon/><div><strong>Pronto.</strong><span>Como o atendimento é remoto, não é necessário criar viagem, hotel ou veículo.</span></div></div>}
+          </> : scheduleEditor(Boolean(appointment && editingAppointment))}
         </>}
-      </>}
-    </section>
-  </div>
+      </section>
+    </div>
+
+    <ConfirmActionModal
+      open={Boolean(holidayPrompt)}
+      title={holidayPrompt?.unavailable ? "Não foi possível verificar feriados" : "Agendar em feriado?"}
+      description={holidayPrompt?.unavailable ? "A consulta de feriados nacionais está indisponível no momento. Você pode continuar ciente disso." : holidayPrompt ? `O período inclui ${holidayPrompt.holidays.length === 1 ? 'um feriado nacional' : `${holidayPrompt.holidays.length} feriados nacionais`}.` : ''}
+      detail={holidayPrompt?.unavailable ? "Se preferir, cancele e tente novamente antes de confirmar a data com o cliente." : holidayPrompt ? holidayPrompt.holidays.map(h => `${h.date.split('-').reverse().join('/')} • ${h.name}`).join('\n') : ''}
+      confirmLabel={holidayPrompt?.unavailable ? "Agendar sem verificação" : "Agendar mesmo sendo feriado"}
+      variant="warning"
+      busy={busy}
+      onCancel={()=>!busy&&setHolidayPrompt(null)}
+      onConfirm={()=>{const mode=holidayPrompt?.mode;setHolidayPrompt(null);if(mode==='edit')void saveExisting();else if(mode==='create')void createSchedule()}}
+    />
+
+    <ConfirmActionModal
+      open={deleteOpen}
+      title="Excluir demanda?"
+      description={`${demand.client} será removido do Routine Assist.`}
+      detail={deleteDetail}
+      confirmLabel="Excluir demanda"
+      busy={busy}
+      error={error}
+      onCancel={()=>!busy&&setDeleteOpen(false)}
+      onConfirm={()=>void removeDemand()}
+    />
+  </>
 }

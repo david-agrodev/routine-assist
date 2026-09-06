@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { NavLink } from 'react-router-dom'
-import { BellIcon, CalendarIcon, HomeIcon, InboxIcon, PlusIcon, SettingsIcon, TripIcon } from './Icons'
+import { useEffect, useRef, useState } from 'react'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { BellIcon, CalendarIcon, HomeIcon, InboxIcon, LogoutIcon, PlusIcon, SettingsIcon, TripIcon } from './Icons'
 import { NotificationPanel } from './NotificationPanel'
 import { useAuth } from '../context/AuthContext'
 import { useRoutine } from '../context/RoutineContext'
@@ -22,7 +22,11 @@ function initials(nameOrEmail: string) {
 
 export function Layout({ children, onNewDemand }: { children: React.ReactNode; onNewDemand: () => void }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const { user } = useAuth()
+  const [profileOpen,setProfileOpen]=useState(false)
+  const [signingOut,setSigningOut]=useState(false)
+  const profileRef=useRef<HTMLDivElement|null>(null)
+  const navigate=useNavigate()
+  const { user, signOut } = useAuth()
   const { demands, trips, notificationPreferences } = useRoutine()
   const pendingItems = buildPendingItems(demands, trips, notificationPreferences)
   const notificationCount = pendingItems.length
@@ -46,6 +50,28 @@ export function Layout({ children, onNewDemand }: { children: React.ReactNode; o
     })
   }, [notificationPreferences.pushEnabled, pendingItems.map(item=>item.id+item.stage).join('|')])
 
+  useEffect(()=>{
+    if(!profileOpen) return
+    const onPointer=(event:PointerEvent)=>{
+      if(profileRef.current && !profileRef.current.contains(event.target as Node)) setProfileOpen(false)
+    }
+    window.addEventListener('pointerdown',onPointer)
+    return ()=>window.removeEventListener('pointerdown',onPointer)
+  },[profileOpen])
+
+  const logout=async()=>{
+    if(signingOut) return
+    setSigningOut(true)
+    try {
+      setProfileOpen(false)
+      try {
+        localStorage.removeItem('routine-assist-last-route')
+        localStorage.removeItem('routine-assist-selected-trip')
+      } catch { /* noop */ }
+      await signOut()
+    } finally { setSigningOut(false) }
+  }
+
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><img src="/routine-assist-logo.png" alt="Routine Assist" /></div>
@@ -60,7 +86,14 @@ export function Layout({ children, onNewDemand }: { children: React.ReactNode; o
         <div className="topbar-actions">
           <button className="primary desktop-only" onClick={onNewDemand}><PlusIcon/> Nova demanda</button>
           <button className="icon-button" aria-label="Notificações" onClick={()=>setNotificationsOpen(true)}><BellIcon/>{notificationCount > 0 && <span className="badge">{notificationCount > 9 ? '9+' : notificationCount}</span>}</button>
-          <NavLink to="/configuracoes" className="avatar" aria-label="Configurações do usuário" title={display}>{initials(display)}</NavLink>
+          <div className="profile-menu-wrap" ref={profileRef}>
+            <button className="avatar avatar-button" aria-label="Menu do usuário" title={display} onClick={()=>setProfileOpen(v=>!v)}>{initials(display)}</button>
+            {profileOpen && <div className="profile-popover">
+              <div className="profile-popover-head"><span className="avatar mini-avatar">{initials(display)}</span><div><strong>{user?.user_metadata?.full_name || 'Usuário'}</strong><small>{user?.email}</small></div></div>
+              <button onClick={()=>{setProfileOpen(false);navigate('/configuracoes')}}><SettingsIcon/><span>Configurações</span></button>
+              <button className="logout-action" disabled={signingOut} onClick={()=>void logout()}><LogoutIcon/><span>{signingOut?'Saindo...':'Sair do sistema'}</span></button>
+            </div>}
+          </div>
         </div>
       </header>
       <div className="content">{children}</div>
