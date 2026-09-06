@@ -1,6 +1,6 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { useEffect, useMemo, useState } from 'react'
-import { HotelIcon, LocationIcon } from './Icons'
+import { BuildingIcon, CheckIcon, ClockIcon, HotelIcon, LocationIcon, MoneyIcon } from './Icons'
 import { LocationFields } from './LocationFields'
 import { useRoutine } from '../context/RoutineContext'
 import { formatMoney } from '../lib/format'
@@ -17,6 +17,7 @@ export function LodgingModal({ trip, lodging, onClose }: { trip: Trip|null; lodg
 
   useEffect(()=>{
     if(!trip)return
+    setError(null)
     if(lodging){
       setHotelId(lodging.hotelId||''); setName(lodging.name||''); setAddress(lodging.address||''); setCity(lodging.city||''); setState(lodging.state||''); setPhone(lodging.phone||'')
       setCheckIn(lodging.checkIn); setCheckOut(lodging.checkOut); setMode(lodging.pricingMode); setDaily(lodging.dailyValue?.toString().replace('.',',')||''); setTotal(lodging.totalValue?.toString().replace('.',',')||''); setCode(lodging.reservationCode||''); setConfirmed(lodging.confirmed); setNotes(lodging.notes||'')
@@ -27,7 +28,7 @@ export function LodgingModal({ trip, lodging, onClose }: { trip: Trip|null; lodg
       setHotelId(d?.hotelId||''); setName(d?.name||''); setAddress(d?.address||''); setCity(d?.city||trip.appointments[0]?.city||''); setState(d?.state||trip.appointments[0]?.state||''); setPhone(d?.phone||'')
       setCheckIn(d?.checkIn||trip.start); setCheckOut(d?.checkOut||trip.end); setMode(d?.mode||'daily'); setDaily(d?.daily||''); setTotal(d?.total||''); setCode(d?.code||''); setConfirmed(d?.confirmed??true); setNotes(d?.notes||'')
     }catch{}
-  },[trip?.id,lodging?.id])
+  },[trip?.id,lodging?.id,key])
 
   useEffect(()=>{
     if(!trip || lodging)return
@@ -52,33 +53,63 @@ export function LodgingModal({ trip, lodging, onClose }: { trip: Trip|null; lodg
     if(checkOut<checkIn){setError('O check-out não pode ser anterior ao check-in.');return}
     setBusy(true);setError(null)
     try{
-      await addLodging({tripId:trip.id,reservationId:lodging?.id,hotelId:hotelId||lodging?.hotelId,hotelName:name,address:address||undefined,city:city||undefined,state:state||undefined,phone:phone||undefined,checkIn,checkOut,pricingMode:mode,dailyValue:mode==='daily'&&daily?dailyNumber:undefined,totalValue:mode==='total'&&total?Number(total.replace(',','.')):undefined,reservationCode:code||undefined,confirmed,notes:notes||undefined})
-      localStorage.removeItem(key);onClose()
+      await addLodging({
+        tripId:trip.id,
+        reservationId:lodging?.id,
+        hotelId:hotelId||lodging?.hotelId,
+        hotelName:name,
+        address:address||undefined,
+        city:city||undefined,
+        state:state||undefined,
+        phone:phone||undefined,
+        checkIn,
+        checkOut,
+        pricingMode:mode,
+        dailyValue:mode==='daily'&&daily?dailyNumber:undefined,
+        totalValue:mode==='total'&&total?Number(total.replace(',','.')):undefined,
+        reservationCode:code||undefined,
+        confirmed,
+        notes:notes||undefined,
+      })
+      try{localStorage.removeItem(key)}catch{}
+      onClose()
     }catch(e:any){setError(e?.message||'Não foi possível salvar a hospedagem.')}finally{setBusy(false)}
   }
 
-  return <div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&!busy&&onClose()}><section className="modal-card lodging-modal-card">
-    <div className="modal-head"><div><span className="eyebrow">Hospedagem</span><h2>{lodging?'Editar hospedagem':trip.title}</h2></div><button className="close" onClick={onClose}>×</button></div>
+  return <div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&!busy&&onClose()}><section className="modal-card lodging-modal-card lodging-modal-v14">
+    <div className="modal-head"><div><span className="eyebrow">Hospedagem</span><h2>{lodging?'Editar hospedagem':'Cadastrar hospedagem'}</h2><p className="modal-head-copy">{trip.title} • {trip.start.split('-').reverse().join('/')} → {trip.end.split('-').reverse().join('/')}</p></div><button className="close" onClick={onClose}>×</button></div>
 
-    {hotels.length>0 && <label className="field field-wide saved-hotel-field"><span>Usar hotel já cadastrado</span><select value={hotelId} onChange={e=>chooseHotel(e.target.value)}><option value="">Cadastrar/usar outro hotel</option>{hotels.map(h=><option key={h.id} value={h.id}>{h.name}{h.city?` • ${h.city}/${h.state||''}`:''}</option>)}</select></label>}
-
-    <div className="form-grid lodging-grid">
-      <label className="field field-wide"><span>Hotel *</span><input value={name} onChange={e=>{setName(e.target.value); if(hotelId)setHotelId('')}} placeholder="Nome do hotel"/></label>
-      <LocationFields city={city} state={state} onCityChange={setCity} onStateChange={setState}/>
-      <label className="field field-wide"><span>Endereço</span><input value={address} onChange={e=>setAddress(e.target.value)} placeholder="Rua, número, bairro"/></label>
-      <label className="field"><span>Telefone</span><input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="Opcional"/></label>
-      <label className="field"><span>Check-in *</span><input type="date" value={checkIn} onChange={e=>setCheckIn(e.target.value)}/></label>
-      <label className="field"><span>Check-out *</span><input type="date" value={checkOut} onChange={e=>setCheckOut(e.target.value)}/></label>
-      <label className="field"><span>Cobrança</span><select value={mode} onChange={e=>setMode(e.target.value as 'daily'|'total')}><option value="daily">Valor por diária</option><option value="total">Valor total</option></select></label>
-      {mode==='daily'?<label className="field"><span>Valor da diária</span><input inputMode="decimal" value={daily} onChange={e=>setDaily(e.target.value)} placeholder="185,00"/></label>:<label className="field"><span>Valor total</span><input inputMode="decimal" value={total} onChange={e=>setTotal(e.target.value)} placeholder="690,00"/></label>}
-      <label className="field"><span>Nº da reserva</span><input value={code} onChange={e=>setCode(e.target.value)} placeholder="Opcional"/></label>
-      <label className="field field-wide"><span>Observações</span><textarea rows={3} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Ex.: café incluso, estacionamento, horário de check-in..."/></label>
+    <div className="lodging-form-section">
+      <div className="lodging-section-title"><span className="section-icon neutral"><BuildingIcon/></span><div><strong>Hotel e localização</strong><small>Escolha um hotel salvo ou informe os dados da hospedagem.</small></div></div>
+      {hotels.length>0 && <label className="field field-wide saved-hotel-field"><span>Hotel já cadastrado</span><select value={hotelId} onChange={e=>chooseHotel(e.target.value)}><option value="">Cadastrar/usar outro hotel</option>{hotels.map(h=><option key={h.id} value={h.id}>{h.name}{h.city?` • ${h.city}/${h.state||''}`:''}</option>)}</select></label>}
+      <div className="form-grid lodging-grid lodging-grid-v14">
+        <label className="field field-wide"><span>Nome do hotel *</span><input value={name} onChange={e=>{setName(e.target.value); if(hotelId)setHotelId('')}} placeholder="Nome do hotel"/></label>
+        <LocationFields city={city} state={state} onCityChange={setCity} onStateChange={setState}/>
+        <label className="field field-wide"><span>Endereço</span><input value={address} onChange={e=>setAddress(e.target.value)} placeholder="Rua, número, bairro"/></label>
+        <label className="field"><span>Telefone</span><input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="Opcional"/></label>
+      </div>
     </div>
 
-    <div className="lodging-cost-preview"><div><span>{nights} {nights===1?'noite':'noites'}</span><strong>{estimatedTotal>0?formatMoney(estimatedTotal):'Valor ainda não informado'}</strong></div>{address&&<a target="_blank" rel="noreferrer" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}><LocationIcon/> Ver no Maps</a>}</div>
+    <div className="lodging-form-split">
+      <div className="lodging-form-section compact-section">
+        <div className="lodging-section-title"><span className="section-icon plum"><ClockIcon/></span><div><strong>Período</strong><small>Datas efetivas da hospedagem.</small></div></div>
+        <div className="form-grid lodging-date-grid"><label className="field"><span>Check-in *</span><input type="date" value={checkIn} onChange={e=>setCheckIn(e.target.value)}/></label><label className="field"><span>Check-out *</span><input type="date" value={checkOut} onChange={e=>setCheckOut(e.target.value)}/></label></div>
+      </div>
+      <div className="lodging-form-section compact-section">
+        <div className="lodging-section-title"><span className="section-icon terracotta"><MoneyIcon/></span><div><strong>Valor</strong><small>Registre diária ou valor total negociado.</small></div></div>
+        <div className="form-grid lodging-price-grid"><label className="field"><span>Cobrança</span><select value={mode} onChange={e=>setMode(e.target.value as 'daily'|'total')}><option value="daily">Valor por diária</option><option value="total">Valor total</option></select></label>{mode==='daily'?<label className="field"><span>Valor da diária</span><input inputMode="decimal" value={daily} onChange={e=>setDaily(e.target.value)} placeholder="185,00"/></label>:<label className="field"><span>Valor total</span><input inputMode="decimal" value={total} onChange={e=>setTotal(e.target.value)} placeholder="690,00"/></label>}</div>
+      </div>
+    </div>
 
-    <label className="confirm-row"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/><span><strong>Reserva confirmada</strong><small>Se ainda estiver cotando, desmarque e o alerta continuará ativo.</small></span></label>
+    <div className="lodging-form-section">
+      <div className="lodging-section-title"><span className="section-icon warn"><CheckIcon/></span><div><strong>Reserva</strong><small>Informações opcionais para consulta durante a viagem.</small></div></div>
+      <div className="form-grid lodging-grid lodging-grid-v14"><label className="field"><span>Nº da reserva</span><input value={code} onChange={e=>setCode(e.target.value)} placeholder="Opcional"/></label><label className="field field-wide"><span>Observações</span><textarea rows={3} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Ex.: café incluso, estacionamento, horário de check-in..."/></label></div>
+      <label className="confirm-row"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/><span><strong>Reserva confirmada</strong><small>Se ainda estiver cotando, desmarque e o alerta continuará ativo.</small></span></label>
+    </div>
+
+    <div className="lodging-cost-preview lodging-cost-preview-v14"><div><span>{nights} {nights===1?'noite':'noites'}</span><strong>{estimatedTotal>0?formatMoney(estimatedTotal):'Valor ainda não informado'}</strong></div>{address&&<a target="_blank" rel="noreferrer" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}><LocationIcon/> Abrir no Maps</a>}</div>
+
     {error&&<div className="auth-message error modal-error">{error}</div>}
-    <div className="modal-actions"><button className="ghost" onClick={onClose}>Fechar</button><button className="primary" disabled={!name.trim()||busy} onClick={()=>void save()}><HotelIcon/> {busy?'Salvando...':lodging?'Salvar alterações':'Salvar hospedagem'}</button></div>
+    <div className="modal-actions lodging-modal-actions"><button className="ghost" onClick={onClose}>Fechar</button><button className="primary" disabled={!name.trim()||busy} onClick={()=>void save()}><HotelIcon/> {busy?'Salvando...':lodging?'Salvar alterações':'Salvar hospedagem'}</button></div>
   </section></div>
 }

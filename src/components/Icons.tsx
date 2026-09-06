@@ -22,3 +22,8 @@ export const TrashIcon = (p:P) => <svg {...base} {...p}><path d="M4.5 7h15M9 7V4
 export const FilterIcon = (p:P) => <svg {...base} {...p}><path d="M4 6h16M7 12h10M10 18h4"/><circle cx="8" cy="6" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="12" cy="18" r="1.4"/></svg>
 export const LogoutIcon = (p:P) => <svg {...base} {...p}><path d="M10 5H6.5A2.5 2.5 0 0 0 4 7.5v9A2.5 2.5 0 0 0 6.5 19H10"/><path d="M14 8l4 4-4 4M18 12H9"/></svg>
 export const EditIcon = (p:P) => <svg {...base} {...p}><path d="m5 19 3.4-.7L18 8.7a2 2 0 0 0-2.7-2.7L5.7 15.6Z"/><path d="m13.8 7.5 2.7 2.7M5.7 15.6l2.7 2.7"/></svg>
+export const BuildingIcon = (p:P) => <svg {...base} {...p}><path d="M5 20V5.8A1.8 1.8 0 0 1 6.8 4h8.4A1.8 1.8 0 0 1 17 5.8V20"/><path d="M8 8h2M12 8h2M8 11.5h2M12 11.5h2M8 15h2M12 15h2M3.5 20h17"/></svg>
+export const ClockIcon = (p:P) => <svg {...base} {...p}><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></svg>
+export const MoneyIcon = (p:P) => <svg {...base} {...p}><rect x="4" y="6" width="16" height="12" rx="2.2"/><path d="M7 9.5h.01M17 14.5h.01"/><circle cx="12" cy="12" r="2.2"/></svg>
+export const ListIcon = (p:P) => <svg {...base} {...p}><path d="M9 7h10M9 12h10M9 17h10"/><circle cx="5" cy="7" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="17" r="1"/></svg>
+export const CompassIcon = (p:P) => <svg {...base} {...p}><circle cx="12" cy="12" r="8"/><path d="m14.7 9.3-1.5 3.9-3.9 1.5 1.5-3.9Z"/></svg>

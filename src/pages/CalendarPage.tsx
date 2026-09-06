@@ -19,7 +19,7 @@ export function CalendarPage(){
   const linkedAppointmentIds = useMemo(()=>new Set(trips.flatMap(t => t.appointments.map(a => a.id))),[trips])
   const standaloneAppointments = useMemo(()=>appointments.filter(a => !linkedAppointmentIds.has(a.id)),[appointments,linkedAppointmentIds])
   const navigate = useNavigate()
-  const [mode,setMode]=useState<ViewMode>('week')
+  const [mode,setMode]=useState<ViewMode>('month')
   const [anchor,setAnchor]=useState(()=>new Date())
   const [summaryDate,setSummaryDate]=useState<Date|null>(null)
   const [selectedDemand,setSelectedDemand]=useState<Demand|null>(null)

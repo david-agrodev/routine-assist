@@ -658,16 +658,21 @@ export async function addLodging(
   }
 
   if (input.reservationId) {
-    const { error } = await client.from('lodging_reservations')
+    const { data: updated, error } = await client.from('lodging_reservations')
       .update(payload)
       .eq('workspace_id', workspaceId)
+      .eq('trip_id', input.tripId)
       .eq('id', input.reservationId)
+      .select('id,hotel_id')
+      .maybeSingle()
     if (error) throw error
+    if (!updated?.id) throw new Error('A hospedagem não foi encontrada para edição. Atualize a página e tente novamente.')
     return
   }
 
-  const { error } = await client.from('lodging_reservations').insert(payload)
+  const { data: inserted, error } = await client.from('lodging_reservations').insert(payload).select('id').maybeSingle()
   if (error) throw error
+  if (!inserted?.id) throw new Error('A hospedagem não pôde ser criada.')
 }
 
 export async function saveVehicleReservation(

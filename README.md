@@ -1,47 +1,23 @@
-# Routine Assist v1.3
+# Routine Assist v1.4
 
-Organizador de demandas, agenda, viagens, hotel, veículo e pendências para rotina de campo.
+Organizador de demandas, agenda, viagens, hospedagem e veículo para rotina de campo.
 
-## O que mudou na v1.3
+## Novidades da v1.4
 
-### Demandas
-- O filtro **Todas | ALTA | GENEX** fica somente em **Demandas/Entrada**.
-- Os filtros de status continuam disponíveis para localizar rapidamente uma demanda.
-- Cards mantêm a identificação visual da central.
+- A aba **Viagens** não abre mais uma viagem automaticamente. Primeiro você escolhe o card desejado.
+- Página de viagens reorganizada com cards de seleção e área de detalhes mais clara.
+- Novos ícones personalizados e microinterações nos cards de viagem, hotel, veículo, atendimentos e rota.
+- Indicador visual de preparação da viagem com progresso.
+- Tela de demanda recebeu ajustes de alinhamento e melhor aproveitamento da área útil.
+- O **Calendário abre em Mês** por padrão.
+- Edição de hospedagem reforçada: atualização passa a validar a reserva no Supabase e exibir erro caso a linha não seja encontrada.
+- Modal de hospedagem reorganizado em Hotel/Localização, Período, Valor e Reserva.
 
-### Agenda única e sem sobreposição
-- Agenda e Viagens não possuem mais filtro por central: **ALTA e GENEX ficam sempre visíveis juntas**.
-- O mesmo responsável não pode ter dois atendimentos ocupando a mesma data, independentemente da central.
-- A interface bloqueia conflitos e o banco ganhou um trigger de segurança para impedir sobreposição também no Supabase.
-- Se existirem conflitos antigos criados antes da v1.3, o calendário mostra um alerta para que as datas sejam ajustadas.
+## Atualização
 
-### Calendário mais informativo
-- Viagens mostram **fazendas vinculadas**, clientes e nome da viagem, em vez de exibir somente um título genérico.
-- Viagens com várias fazendas exibem os nomes de forma resumida (ex.: `Fazenda Romy + Fazenda Umbelino`).
-- Sábado e domingo possuem fundo visual diferente.
-- Feriados nacionais são consultados pela **BrasilAPI** e destacados no calendário.
-- Ao tentar agendar um atendimento em feriado nacional, o Routine mostra uma confirmação personalizada antes de salvar.
-- O resumo de uma data também informa quando ela é feriado.
+Não há migration SQL nova nesta versão. Continue com o banco atualizado até a v1.3.
 
-### Viagens
-- A página ganhou uma área **“Qual viagem deseja acessar?”** com cards de todas as viagens.
-- Cada card resume central, período, fazendas, hotel e veículo.
-- Clique em uma viagem para abrir os detalhes e continuar hotel, veículo e rota.
-
-## Banco de dados
-A v1.3 exige executar:
-
-```text
-supabase/migration-v1.3.sql
-```
-
-A migration **não apaga dados**. Ela adiciona o bloqueio definitivo contra novos períodos sobrepostos para o mesmo responsável.
-
-## Atualização a partir da v1.2
-1. Preserve seu `.env.local`.
-2. No Supabase → SQL Editor, execute `supabase/migration-v1.3.sql`.
-3. Substitua os arquivos pelo conteúdo desta versão.
-4. Rode:
+Preserve seu `.env.local` e execute:
 
 ```bash
 npm install
@@ -49,12 +25,12 @@ npm run build
 npm run dev
 ```
 
-5. Para publicar:
+Para publicar:
 
 ```bash
 git add .
-git commit -m "feat: Routine Assist v1.3"
+git commit -m "feat: Routine Assist v1.4"
 git push origin main
 ```
 
-A Vercel fará o deploy automaticamente se o repositório estiver conectado.
+A Vercel conectada ao repositório fará o deploy automaticamente.
