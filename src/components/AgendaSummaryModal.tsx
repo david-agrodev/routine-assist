@@ -5,6 +5,7 @@ import { formatDateRange } from '../lib/format'
 import { isHotelReady, isVehicleReady } from '../lib/tripReadiness'
 import { appointmentCompanyKey, companyClass, companyLabel, tripCompanyKey } from '../lib/company'
 import { holidayForDate } from '../lib/calendar'
+import { tripDisplayTitle } from '../lib/tripTitle'
 import type { Appointment, Demand, Holiday, Trip } from '../types/routine'
 
 export function AgendaSummaryModal({
@@ -50,8 +51,8 @@ export function AgendaSummaryModal({
             <div className="agenda-summary-icon"><RouteIcon/></div>
             <div className="grow">
               <div className="summary-title-line"><span className="company-badge">{companyLabel(key)}</span><span className="eyebrow">Viagem</span></div>
-              <h3>{trip.title}</h3>
-              <p>{formatDateRange(trip.start, trip.end)}{trip.origin ? ` • Saída de ${trip.origin}` : ''}</p>
+              <h3>{tripDisplayTitle(trip)}</h3>
+              <p>{formatDateRange(trip.start, trip.end)}{trip.origin ? ` • Partida: ${trip.origin}` : ''}</p>
               <div className="summary-chips">
                 <span><CheckIcon/> {trip.appointments.length} {trip.appointments.length === 1 ? 'atendimento' : 'atendimentos'}</span>
                 <span className={hotelReady ? 'ok' : 'pending'}><HotelIcon/> {trip.hotelRequired ? (hotelReady ? 'Hotel organizado' : 'Hotel pendente') : 'Sem hotel'}</span>

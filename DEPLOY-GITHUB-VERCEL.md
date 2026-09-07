@@ -1,28 +1,17 @@
-# Deploy Routine Assist v1.4
+# Deploy Routine Assist v1.6
 
-## 1. Teste local
-
-```bash
-npm install
-npm run build
-npm run dev
-```
-
-## 2. GitHub
+Depois de executar a migration v1.6 no Supabase e validar localmente:
 
 ```bash
 git add .
-git commit -m "feat: Routine Assist v1.4"
+git commit -m "feat: Routine Assist v1.6"
 git push origin main
 ```
 
-## 3. Vercel
+O repositório `david-agrodev/routine-assist` já está conectado à Vercel, então o push em `main` deve disparar um novo deploy automaticamente.
 
-O projeto já conectado ao GitHub deve iniciar um novo deploy automaticamente.
-
-Variáveis necessárias na Vercel:
+As variáveis da Vercel continuam as mesmas:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
-
-Use tipo **Config** para essas variáveis públicas do frontend.
+- `VITE_CONTROL_TECH_URL` (quando usado)

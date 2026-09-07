@@ -73,6 +73,8 @@ export type VehicleReservation = {
   notes?: string
 }
 
+export type TripStatus = 'planned' | 'completed'
+
 export type Trip = {
   id: string
   title: string
@@ -84,6 +86,11 @@ export type Trip = {
   lodgings: Lodging[]
   vehicleRequired: boolean
   vehicles: VehicleReservation[]
+  status: TripStatus
+  completedAt?: string
+  routeDistanceKm?: number
+  routeDurationMinutes?: number
+  routeCalculatedAt?: string
 }
 
 export type Holiday = {
@@ -212,4 +219,10 @@ export type UpdateTripInput = {
   end: string
   hotelRequired: boolean
   vehicleRequired: boolean
+}
+
+export type SaveTripRouteInput = {
+  tripId: string
+  distanceKm: number
+  durationMinutes: number
 }

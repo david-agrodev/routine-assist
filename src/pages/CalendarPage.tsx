@@ -46,14 +46,17 @@ export function CalendarPage(){
   },[holidays,periodStart,periodEnd])
 
   const existingConflicts=useMemo(()=>{
+    const tripIdsByAppointment=new Map<string,Set<string>>()
+    trips.forEach(t=>t.appointments.forEach(a=>{const set=tripIdsByAppointment.get(a.id)||new Set<string>();set.add(t.id);tripIdsByAppointment.set(a.id,set)}))
+    const shareTrip=(aId:string,bId:string)=>{const aTrips=tripIdsByAppointment.get(aId);const bTrips=tripIdsByAppointment.get(bId);if(!aTrips||!bTrips)return false;return [...aTrips].some(id=>bTrips.has(id))}
     const pairs:{first:string;second:string;start:string;end:string}[]=[]
     for(let i=0;i<appointments.length;i++) for(let j=i+1;j<appointments.length;j++){
       const a=appointments[i],b=appointments[j]
       const sameResponsible=!a.responsible||!b.responsible||a.responsible===b.responsible
-      if(sameResponsible&&a.start<=b.end&&a.end>=b.start) pairs.push({first:a.farmName||a.client,second:b.farmName||b.client,start:a.start>b.start?a.start:b.start,end:a.end<b.end?a.end:b.end})
+      if(sameResponsible&&a.start<=b.end&&a.end>=b.start&&!shareTrip(a.id,b.id)) pairs.push({first:a.farmName||a.client,second:b.farmName||b.client,start:a.start>b.start?a.start:b.start,end:a.end<b.end?a.end:b.end})
     }
     return pairs
-  },[appointments])
+  },[appointments,trips])
 
   const previous=()=>setAnchor(a=>mode==='month'?addMonths(a,-1):addWeeks(a,-1))
   const next=()=>setAnchor(a=>mode==='month'?addMonths(a,1):addWeeks(a,1))

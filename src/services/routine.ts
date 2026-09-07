@@ -1,5 +1,6 @@
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { suggestedTripTitle } from '../lib/tripTitle'
 import type {
   AddLodgingInput,
   Appointment,
@@ -11,6 +12,7 @@ import type {
   Trip,
   Hotel,
   NotificationPreferences,
+  SaveTripRouteInput,
 } from '../types/routine'
 
 function requireClient() {
@@ -149,7 +151,7 @@ export async function getTrips(workspaceId: string): Promise<Trip[]> {
   const { data, error } = await client
     .from('trips')
     .select(`
-      id,title,origin,starts_at,ends_at,hotel_required,vehicle_required,
+      id,title,origin,starts_at,ends_at,hotel_required,vehicle_required,status,completed_at,route_distance_km,route_duration_minutes,route_calculated_at,
       trip_appointments(
         sort_order,
         appointments(id,demand_id,responsible_user_id,title,farm_name_snapshot,city_snapshot,state_snapshot,starts_at,ends_at,appointment_type,client_confirmed)
@@ -225,6 +227,11 @@ export async function getTrips(workspaceId: string): Promise<Trip[]> {
       lodgings,
       vehicleRequired: Boolean(row.vehicle_required),
       vehicles,
+      status: row.status || 'planned',
+      completedAt: row.completed_at || undefined,
+      routeDistanceKm: row.route_distance_km == null ? undefined : Number(row.route_distance_km),
+      routeDurationMinutes: row.route_duration_minutes == null ? undefined : Number(row.route_duration_minutes),
+      routeCalculatedAt: row.route_calculated_at || undefined,
     }
   })
 }
@@ -383,6 +390,9 @@ export async function createTrip(
       ends_at: input.end,
       hotel_required: input.hotelRequired,
       vehicle_required: input.vehicleRequired,
+      route_distance_km: null,
+      route_duration_minutes: null,
+      route_calculated_at: null,
     })
     .select('id')
     .single()
@@ -439,7 +449,7 @@ export async function linkAppointmentsToTrip(
 
   const { data: trip, error: tripError } = await client
     .from('trips')
-    .select('starts_at,ends_at')
+    .select('title,starts_at,ends_at')
     .eq('workspace_id', workspaceId)
     .eq('id', tripId)
     .single()
@@ -447,13 +457,22 @@ export async function linkAppointmentsToTrip(
 
   const starts = [trip.starts_at, ...(linkedAppointments ?? []).map((a: any) => a.starts_at)].filter(Boolean).sort()
   const ends = [trip.ends_at, ...(linkedAppointments ?? []).map((a: any) => a.ends_at)].filter(Boolean).sort()
-  if (starts.length && ends.length && (starts[0] !== trip.starts_at || ends[ends.length - 1] !== trip.ends_at)) {
-    const { error: resizeError } = await client.from('trips')
-      .update({ starts_at: starts[0], ends_at: ends[ends.length - 1] })
-      .eq('workspace_id', workspaceId)
-      .eq('id', tripId)
-    if (resizeError) throw resizeError
-  }
+  const { data: allLinks, error: allLinksError } = await client.from('trip_appointments')
+    .select('sort_order,appointments(title,farm_name_snapshot,city_snapshot,state_snapshot)')
+    .eq('trip_id', tripId)
+  if (allLinksError) throw allLinksError
+  const allStops=(allLinks ?? []).sort((a:any,b:any)=>(a.sort_order??0)-(b.sort_order??0)).map((link:any)=>({
+    client:link.appointments?.title || '', farmName:link.appointments?.farm_name_snapshot || undefined, city:link.appointments?.city_snapshot || undefined, state:link.appointments?.state_snapshot || undefined,
+  }))
+  const autoTitle = /^Viagem\s+/i.test(trip.title || '') || /^Nova viagem$/i.test(trip.title || '')
+  const updatePayload:any={ route_distance_km:null, route_duration_minutes:null, route_calculated_at:null }
+  if (starts.length && ends.length) { updatePayload.starts_at=starts[0]; updatePayload.ends_at=ends[ends.length - 1] }
+  if (autoTitle && allStops.length) updatePayload.title=suggestedTripTitle(allStops as any)
+  const { error: resizeError } = await client.from('trips')
+    .update(updatePayload)
+    .eq('workspace_id', workspaceId)
+    .eq('id', tripId)
+  if (resizeError) throw resizeError
 
   const demandIds = [...new Set((linkedAppointments ?? []).map((a: any) => a.demand_id).filter(Boolean))]
   if (demandIds.length) {
@@ -558,10 +577,23 @@ export async function updateTrip(
       ends_at: input.end,
       hotel_required: input.hotelRequired,
       vehicle_required: input.vehicleRequired,
+      route_distance_km: null,
+      route_duration_minutes: null,
+      route_calculated_at: null,
     })
     .eq('workspace_id', workspaceId)
     .eq('id', input.tripId)
   if (error) throw error
+}
+
+export async function saveTripRoute(workspaceId:string,input:SaveTripRouteInput):Promise<void>{
+  const client=requireClient()
+  const {error}=await client.from('trips').update({
+    route_distance_km:input.distanceKm,
+    route_duration_minutes:input.durationMinutes,
+    route_calculated_at:new Date().toISOString(),
+  }).eq('workspace_id',workspaceId).eq('id',input.tripId)
+  if(error) throw error
 }
 
 export async function getHotels(workspaceId: string): Promise<Hotel[]> {
@@ -710,6 +742,33 @@ export async function saveVehicleReservation(
 
 
 
+
+export async function completeTrip(workspaceId: string, tripId: string): Promise<void> {
+  const client = requireClient()
+  const { data: links, error: linkError } = await client
+    .from('trip_appointments')
+    .select('appointments(demand_id)')
+    .eq('trip_id', tripId)
+  if (linkError) throw linkError
+
+  const { error: tripError } = await client
+    .from('trips')
+    .update({ status: 'completed', completed_at: new Date().toISOString() })
+    .eq('workspace_id', workspaceId)
+    .eq('id', tripId)
+  if (tripError) throw tripError
+
+  const demandIds = [...new Set((links ?? []).map((row: any) => row.appointments?.demand_id).filter(Boolean))]
+  if (demandIds.length) {
+    const { error: demandError } = await client
+      .from('demands')
+      .update({ status: 'done', next_step: 'Concluída' })
+      .eq('workspace_id', workspaceId)
+      .in('id', demandIds)
+    if (demandError) throw demandError
+  }
+}
+
 export async function deleteDemand(workspaceId: string, demandId: string): Promise<void> {
   const client = requireClient()
   const { data: appointmentRows, error: appointmentLookupError } = await client
@@ -756,7 +815,7 @@ export async function deleteTrip(workspaceId: string, tripId: string): Promise<v
   if (demandIds.length) {
     const { error: demandError } = await client
       .from('demands')
-      .update({ next_step: 'Organizar viagem' })
+      .update({ status: 'scheduled', next_step: 'Organizar viagem' })
       .eq('workspace_id', workspaceId)
       .in('id', demandIds)
     if (demandError) throw demandError

@@ -6,6 +6,7 @@ import { MobileAgenda } from '../components/MobileAgenda'
 import { useRoutine } from '../context/RoutineContext'
 import { buildPendingItems } from '../lib/pending'
 import { isHotelReady, isVehicleReady } from '../lib/tripReadiness'
+import { tripDisplayTitle } from '../lib/tripTitle'
 
 function greeting(){
   const h=new Date().getHours()
@@ -14,11 +15,12 @@ function greeting(){
 
 export function Dashboard() {
   const { demands, trips, appointments, loading, error, notificationPreferences } = useRoutine()
-  const pending = buildPendingItems(demands,trips,notificationPreferences)
-  const linkedAppointmentIds = new Set(trips.flatMap(t => t.appointments.map(a => a.id)))
+  const activeTrips = trips.filter(t=>t.status==='planned')
+  const pending = buildPendingItems(demands,activeTrips,notificationPreferences)
+  const linkedAppointmentIds = new Set(activeTrips.flatMap(t => t.appointments.map(a => a.id)))
   const standaloneAppointments = appointments.filter(a => !linkedAppointmentIds.has(a.id))
   const today = startOfDay(new Date())
-  const nextTrip = trips.find(t=>parseISO(t.end)>=today) ?? trips[0]
+  const nextTrip = activeTrips.find(t=>parseISO(t.end)>=today) ?? activeTrips[0]
   const activeDemands = demands.filter(d=>!['done','cancelled'].includes(d.status)).length
   const weekAnchor = nextTrip?.start || standaloneAppointments[0]?.start || new Date()
   const nextDays = nextTrip ? differenceInCalendarDays(parseISO(nextTrip.start),today) : null
@@ -27,7 +29,7 @@ export function Dashboard() {
   const vehicleReady = nextTrip ? isVehicleReady(nextTrip) : false
   const todayIso = format(new Date(),'yyyy-MM-dd')
   const todayAppointments = standaloneAppointments.filter(a=>a.start<=todayIso && a.end>=todayIso)
-  const todayTrips = trips.filter(t=>t.start<=todayIso && t.end>=todayIso)
+  const todayTrips = activeTrips.filter(t=>t.start<=todayIso && t.end>=todayIso)
 
   return <>
     <section className="page-heading"><div><span className="eyebrow">{dateLabel}</span><h1>{greeting()}</h1><p>Aqui está o que precisa da sua atenção.</p></div></section>
@@ -35,14 +37,14 @@ export function Dashboard() {
     {(todayAppointments.length>0 || todayTrips.length>0) && <section className="today-strip panel"><div><span className="eyebrow">Hoje</span><strong>{todayTrips.length?`${todayTrips.length} viagem${todayTrips.length===1?'':'ns'} em andamento`:'Sem viagem hoje'}</strong><span>{todayAppointments.length?`${todayAppointments.length} atendimento${todayAppointments.length===1?'':'s'} hoje`:'Nenhum atendimento hoje'}</span></div><a className="text-link" href="/calendario">Abrir agenda <ArrowIcon/></a></section>}
     <section className="metric-grid">
       <article className="metric-card"><div className="metric-icon warn"><AlertIcon/></div><div><strong>{pending.length}</strong><span>Pendências</span></div></article>
-      <article className="metric-card"><div className="metric-icon plum"><RouteIcon/></div><div><strong>{trips.length}</strong><span>{trips.length===1?'Viagem':'Viagens'}</span></div></article>
+      <article className="metric-card"><div className="metric-icon plum"><RouteIcon/></div><div><strong>{activeTrips.length}</strong><span>{activeTrips.length===1?'Viagem ativa':'Viagens ativas'}</span></div></article>
       <article className="metric-card"><div className="metric-icon neutral"><CheckIcon/></div><div><strong>{activeDemands}</strong><span>Demandas ativas</span></div></article>
     </section>
     <div className="dashboard-grid">
       <section className="panel next-trip">
-        <div className="panel-head"><div><span className="eyebrow">Próxima viagem</span><h2>{nextTrip?.title || 'Nenhuma viagem planejada'}</h2></div>{nextTrip && <span className="countdown">{nextDays==null?'':nextDays<0?'em andamento':nextDays===0?'hoje':`em ${nextDays} dias`}</span>}</div>
+        <div className="panel-head"><div><span className="eyebrow">Próxima viagem</span><h2>{nextTrip ? tripDisplayTitle(nextTrip) : 'Nenhuma viagem planejada'}</h2></div>{nextTrip && <span className="countdown">{nextDays==null?'':nextDays<0?'em andamento':nextDays===0?'hoje':`em ${nextDays} dias`}</span>}</div>
         {nextTrip ? <>
-          <div className="trip-date"><strong>{nextTrip.start.split('-').reverse().join('/')} → {nextTrip.end.split('-').reverse().join('/')}</strong><span>{nextTrip.origin ? `Saída de ${nextTrip.origin} • `:''}{nextTrip.appointments.length} atendimento{nextTrip.appointments.length===1?'':'s'}</span></div>
+          <div className="trip-date"><strong>{nextTrip.start.split('-').reverse().join('/')} → {nextTrip.end.split('-').reverse().join('/')}</strong><span>{nextTrip.origin ? `Ponto de partida: ${nextTrip.origin} • `:''}{nextTrip.appointments.length} atendimento{nextTrip.appointments.length===1?'':'s'}</span></div>
           <div className="check-list">
             <div className={nextTrip.appointments.length ? 'ok':'pending'}><CheckIcon/> {nextTrip.appointments.length ? 'Atendimentos vinculados':'Nenhum atendimento vinculado'}</div>
             <div className={hotelReady?'ok':'pending'}><HotelIcon/> {hotelReady?'Hospedagem organizada':'Hotel ainda não reservado'}</div>
@@ -59,6 +61,6 @@ export function Dashboard() {
         </div>
       </section>
     </div>
-    <section className="panel calendar-panel"><div className="panel-head"><div><span className="eyebrow">Agenda</span><h2>Visão da semana</h2></div><a className="text-link" href="/calendario">Abrir calendário <ArrowIcon/></a></div>{loading && appointments.length===0 && trips.length===0 ? <div className="empty-inline">Carregando agenda...</div> : <><div className="desktop-calendar"><WeekCalendar compact trips={trips} appointments={standaloneAppointments} demands={demands} weekStart={weekAnchor}/></div><div className="mobile-calendar"><MobileAgenda compact trips={trips} appointments={standaloneAppointments} demands={demands} weekStart={weekAnchor}/></div></>}</section>
+    <section className="panel calendar-panel"><div className="panel-head"><div><span className="eyebrow">Agenda</span><h2>Visão da semana</h2></div><a className="text-link" href="/calendario">Abrir calendário <ArrowIcon/></a></div>{loading && appointments.length===0 && activeTrips.length===0 ? <div className="empty-inline">Carregando agenda...</div> : <><div className="desktop-calendar"><WeekCalendar compact trips={activeTrips} appointments={standaloneAppointments} demands={demands} weekStart={weekAnchor}/></div><div className="mobile-calendar"><MobileAgenda compact trips={activeTrips} appointments={standaloneAppointments} demands={demands} weekStart={weekAnchor}/></div></>}</section>
   </>
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { CarIcon, CheckIcon } from './Icons'
 import { useRoutine } from '../context/RoutineContext'
 import { VEHICLE_FORM_URL } from '../lib/constants'
+import { tripDisplayTitle } from '../lib/tripTitle'
 import type { Trip, VehicleReservation } from '../types/routine'
 
 export function VehicleModal({trip,onClose}:{trip:Trip|null;onClose:()=>void}){
@@ -21,7 +22,7 @@ export function VehicleModal({trip,onClose}:{trip:Trip|null;onClose:()=>void}){
   const save=async(nextStatus=status)=>{setBusy(true);setError(null);try{await saveVehicleReservation({tripId:trip.id,reservationId:current?.id,status:nextStatus,company:company||undefined,locator:locator||undefined,pickupAt:pickupAt||undefined,returnAt:returnAt||undefined,pickupLocation:pickupLocation||undefined,notes:notes||undefined});localStorage.removeItem(key);onClose()}catch(e:any){setError(e?.message||'Não foi possível salvar o veículo.')}finally{setBusy(false)}}
 
   return <div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&!busy&&onClose()}><section className="modal-card">
-    <div className="modal-head"><div><span className="eyebrow">Veículo</span><h2>{trip.title}</h2></div><button className="close" onClick={onClose}>×</button></div>
+    <div className="modal-head"><div><span className="eyebrow">Veículo</span><h2>{tripDisplayTitle(trip)}</h2></div><button className="close" onClick={onClose}>×</button></div>
     <a className="primary vehicle-form-cta" href={VEHICLE_FORM_URL} target="_blank" rel="noreferrer"><CarIcon/> Abrir Forms corporativo ↗</a>
     {!current && <button className="vehicle-requested-quick" disabled={busy} onClick={()=>void save('requested')}><CheckIcon/> Já enviei o Forms — marcar como solicitado</button>}
     <div className="soft-note">O Forms continua sendo o canal oficial da reserva. Aqui você acompanha se já solicitou, qual locadora foi confirmada e os dados de retirada/devolução.</div>

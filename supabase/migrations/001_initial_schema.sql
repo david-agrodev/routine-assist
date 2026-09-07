@@ -139,6 +139,8 @@ create table if not exists public.trips (
   ends_at date not null,
   hotel_required boolean not null default true,
   vehicle_required boolean not null default true,
+  status text not null default 'planned' check (status in ('planned','completed')),
+  completed_at timestamptz,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

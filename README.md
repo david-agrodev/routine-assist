@@ -1,23 +1,31 @@
-# Routine Assist v1.4
+# Routine Assist v1.6
 
-Organizador de demandas, agenda, viagens, hospedagem e veículo para rotina de campo.
+Atualização de rota, ponto de partida, nomes automáticos de viagens unificadas e regra de conflito por viagem.
 
-## Novidades da v1.4
+## Novidades
 
-- A aba **Viagens** não abre mais uma viagem automaticamente. Primeiro você escolhe o card desejado.
-- Página de viagens reorganizada com cards de seleção e área de detalhes mais clara.
-- Novos ícones personalizados e microinterações nos cards de viagem, hotel, veículo, atendimentos e rota.
-- Indicador visual de preparação da viagem com progresso.
-- Tela de demanda recebeu ajustes de alinhamento e melhor aproveitamento da área útil.
-- O **Calendário abre em Mês** por padrão.
-- Edição de hospedagem reforçada: atualização passa a validar a reserva no Supabase e exibir erro caso a linha não seja encontrada.
-- Modal de hospedagem reorganizado em Hotel/Localização, Período, Valor e Reserva.
+- **Origem** virou **Ponto de partida**.
+- Cidade/UF dos destinos continuam vindo das demandas; não são preenchidas novamente na viagem.
+- O Routine sugere nomes de viagem conforme os destinos vinculados:
+  - `Viagem Heliodora`
+  - `Viagem Heliodora • 2 atendimentos`
+  - `Viagem Inhumas + Aparecida de Goiânia`
+- Ao adicionar atendimento a uma viagem com nome automático, o nome é recalculado.
+- **Calcular rota aproximada** na tela da viagem:
+  - geocodificação de cidade via Open-Meteo;
+  - rota rodoviária via OSRM;
+  - distância e tempo estimados;
+  - cálculo considera retorno ao ponto de partida.
+- A estimativa usa os **centros das cidades**, pois o Routine ainda não exige coordenada/endereço exato da fazenda.
+- Conflitos antigos entre atendimentos da **mesma viagem** deixam de ser exibidos como conflito.
+- Ao editar datas de atendimentos já vinculados à mesma viagem, a sobreposição entre eles é permitida. Viagens diferentes continuam bloqueadas.
 
 ## Atualização
 
-Não há migration SQL nova nesta versão. Continue com o banco atualizado até a v1.3.
-
-Preserve seu `.env.local` e execute:
+1. Preserve o seu `.env.local`.
+2. Rode `supabase/migration-v1.6.sql` no SQL Editor do Supabase.
+3. Substitua os arquivos pela v1.6.
+4. Rode:
 
 ```bash
 npm install
@@ -25,12 +33,10 @@ npm run build
 npm run dev
 ```
 
-Para publicar:
+5. Se estiver tudo certo:
 
 ```bash
 git add .
-git commit -m "feat: Routine Assist v1.4"
+git commit -m "feat: Routine Assist v1.6"
 git push origin main
 ```
-
-A Vercel conectada ao repositório fará o deploy automaticamente.

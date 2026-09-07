@@ -27,3 +27,5 @@ export const ClockIcon = (p:P) => <svg {...base} {...p}><circle cx="12" cy="12" 
 export const MoneyIcon = (p:P) => <svg {...base} {...p}><rect x="4" y="6" width="16" height="12" rx="2.2"/><path d="M7 9.5h.01M17 14.5h.01"/><circle cx="12" cy="12" r="2.2"/></svg>
 export const ListIcon = (p:P) => <svg {...base} {...p}><path d="M9 7h10M9 12h10M9 17h10"/><circle cx="5" cy="7" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="17" r="1"/></svg>
 export const CompassIcon = (p:P) => <svg {...base} {...p}><circle cx="12" cy="12" r="8"/><path d="m14.7 9.3-1.5 3.9-3.9 1.5 1.5-3.9Z"/></svg>
+export const SearchIcon = (p:P) => <svg {...base} {...p}><circle cx="10.5" cy="10.5" r="5.8"/><path d="m15 15 4.5 4.5"/></svg>
+export const ArchiveIcon = (p:P) => <svg {...base} {...p}><path d="M5 7h14v12H5z"/><path d="M4 4h16v3H4zM9 11h6"/></svg>

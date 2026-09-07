@@ -1,10 +1,11 @@
 import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
+import { tripDisplayTitle } from './tripTitle'
 import type { Demand, NotificationPreferences, Trip } from '../types/routine'
 import { isHotelReady, isVehicleReady } from './tripReadiness'
 
 export type PendingItem = {
   id: string
-  kind: 'hotel'|'vehicle'|'demand'
+  kind: 'hotel'|'vehicle'|'demand'|'trip'
   title: string
   detail: string
   urgency: 'warn'|'terracotta'|'plum'
@@ -38,9 +39,13 @@ export function buildPendingItems(
 
   if (inAppEnabled) {
     for (const trip of trips) {
+      if (trip.status === 'completed') continue
       const days = daysUntil(trip.start)
       const endDays = daysUntil(trip.end)
-      if (endDays < 0) continue
+      if (endDays < 0) {
+        items.push({ id:`complete-${trip.id}`, kind:'trip', title:'Concluir viagem', detail:`${tripDisplayTitle(trip)} • período encerrado`, urgency:'plum', target:'/viagens', entityId:trip.id })
+        continue
+      }
       const stage = activeStage(days, alertDays)
       if (stage == null) continue
       const countdown = days < 0 ? 'viagem em andamento' : days === 0 ? 'viagem começa hoje' : `faltam ${days} dia${days === 1 ? '' : 's'}`
@@ -50,7 +55,7 @@ export function buildPendingItems(
           id:`hotel-${trip.id}`,
           kind:'hotel',
           title: days <= 1 ? 'Hotel urgente' : 'Reservar hotel',
-          detail:`${trip.title} • ${countdown}`,
+          detail:`${tripDisplayTitle(trip)} • ${countdown}`,
           urgency:urgencyFor(days),
           stage,
           target:'/viagens',
@@ -63,7 +68,7 @@ export function buildPendingItems(
           id:`vehicle-${trip.id}`,
           kind:'vehicle',
           title: days <= 1 ? 'Veículo urgente' : 'Solicitar veículo',
-          detail:`${trip.title} • ${countdown}`,
+          detail:`${tripDisplayTitle(trip)} • ${countdown}`,
           urgency:urgencyFor(days),
           stage,
           target:'/viagens',

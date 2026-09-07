@@ -6,6 +6,7 @@ import { ConfirmActionModal } from './ConfirmActionModal'
 import { useRoutine } from '../context/RoutineContext'
 import { formatCompanyName, formatDateRange, formatEquipmentSummary } from '../lib/format'
 import { isHotelReady, isVehicleReady } from '../lib/tripReadiness'
+import { tripDisplayTitle } from '../lib/tripTitle'
 import { getHolidaysInRange } from '../services/holidays'
 import type { Appointment, AppointmentConflict, Demand, DemandStatus, Holiday } from '../types/routine'
 
@@ -103,12 +104,15 @@ export function DemandDetailModal({ demand, onClose }: { demand: Demand | null; 
 
   let autoStatusText = 'Informações pendentes'
   if (demand.status === 'cancelled') autoStatusText = 'Cancelada'
+  else if (demand.status === 'done' || linkedTrip?.status === 'completed') autoStatusText = 'Concluída'
   else if (linkedTrip) autoStatusText = logisticsReady ? 'Viagem pronta' : 'Logística pendente'
   else if (appointment?.type === 'Remoto') autoStatusText = 'Atendimento remoto agendado'
   else if (appointment) autoStatusText = 'Agendada • organizar viagem'
   else if (infoComplete) autoStatusText = 'Pronta para agendar'
 
-  const autoNextStep = linkedTrip
+  const autoNextStep = demand.status === 'done' || linkedTrip?.status === 'completed'
+    ? 'No histórico'
+    : linkedTrip
     ? logisticsReady ? 'Acompanhar a viagem' : 'Organizar hotel e veículo'
     : appointment?.type === 'Remoto' ? 'Acompanhar atendimento remoto'
     : appointment ? 'Organizar viagem'
@@ -117,6 +121,7 @@ export function DemandDetailModal({ demand, onClose }: { demand: Demand | null; 
 
   const storedStatus: DemandStatus = demand.status === 'cancelled'
     ? 'cancelled'
+    : demand.status === 'done' ? 'done'
     : isScheduled ? 'scheduled' : infoComplete ? 'contact' : 'waiting_info'
 
   const incomplete = [!city.trim() && 'cidade', !state.trim() && 'UF'].filter(Boolean) as string[]
@@ -258,7 +263,7 @@ export function DemandDetailModal({ demand, onClose }: { demand: Demand | null; 
   ]
   const companyOptions = companies.length ? companies : [{ id:'alta', name:'Alta' }, { id:'genex', name:'GENEX' }]
   const deleteDetail = linkedTrip
-    ? `O compromisso será removido da Agenda e desvinculado de “${linkedTrip.title}”. A viagem continuará existindo.`
+    ? `O compromisso será removido da Agenda e desvinculado de “${tripDisplayTitle(linkedTrip)}”. A viagem continuará existindo.`
     : appointment ? 'O compromisso também será removido da Agenda.' : 'Esta ação remove somente a demanda cadastrada.'
 
   const scheduleEditor = (isEdit:boolean) => <>

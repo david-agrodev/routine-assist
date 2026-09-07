@@ -5,6 +5,7 @@ import { LocationFields } from './LocationFields'
 import { useRoutine } from '../context/RoutineContext'
 import { formatMoney } from '../lib/format'
 import type { Lodging, Trip } from '../types/routine'
+import { tripDisplayTitle } from '../lib/tripTitle'
 
 export function LodgingModal({ trip, lodging, onClose }: { trip: Trip|null; lodging?: Lodging|null; onClose:()=>void }){
   const { addLodging, hotels }=useRoutine()
@@ -77,7 +78,7 @@ export function LodgingModal({ trip, lodging, onClose }: { trip: Trip|null; lodg
   }
 
   return <div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&!busy&&onClose()}><section className="modal-card lodging-modal-card lodging-modal-v14">
-    <div className="modal-head"><div><span className="eyebrow">Hospedagem</span><h2>{lodging?'Editar hospedagem':'Cadastrar hospedagem'}</h2><p className="modal-head-copy">{trip.title} • {trip.start.split('-').reverse().join('/')} → {trip.end.split('-').reverse().join('/')}</p></div><button className="close" onClick={onClose}>×</button></div>
+    <div className="modal-head"><div><span className="eyebrow">Hospedagem</span><h2>{lodging?'Editar hospedagem':'Cadastrar hospedagem'}</h2><p className="modal-head-copy">{tripDisplayTitle(trip)} • {trip.start.split('-').reverse().join('/')} → {trip.end.split('-').reverse().join('/')}</p></div><button className="close" onClick={onClose}>×</button></div>
 
     <div className="lodging-form-section">
       <div className="lodging-section-title"><span className="section-icon neutral"><BuildingIcon/></span><div><strong>Hotel e localização</strong><small>Escolha um hotel salvo ou informe os dados da hospedagem.</small></div></div>

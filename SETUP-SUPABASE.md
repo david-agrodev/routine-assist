@@ -1,14 +1,15 @@
-# Supabase — Routine Assist v1.4
+# Supabase — Routine Assist v1.6
 
-A v1.4 não exige nova migration.
+Para uma base que já está na v1.5, execute somente:
 
-Mantenha executadas as migrations anteriores, incluindo a `migration-v1.3.sql`.
+`supabase/migration-v1.6.sql`
 
-## Variáveis do frontend
+A migration:
 
-```env
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_PUBLISHABLE_KEY=...
-```
+- adiciona `route_distance_km` em `trips`;
+- adiciona `route_duration_minutes` em `trips`;
+- adiciona `route_calculated_at` em `trips`;
+- ajusta a regra de conflito para não tratar atendimentos da mesma viagem como conflito durante edição;
+- mantém bloqueios entre viagens diferentes.
 
-Nunca exponha `service_role`, senha do banco ou outras chaves privadas em variáveis `VITE_`.
+Nenhuma demanda, viagem, hotel ou veículo é apagado.
