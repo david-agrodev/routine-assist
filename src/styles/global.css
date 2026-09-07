@@ -390,3 +390,17 @@
 .route-card-v16 .trip-work-card-body{display:flex;flex-direction:column;gap:12px}.route-origin-row,.route-return-row{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;background:#f7f4f0}.route-origin-row small,.route-return-row small{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em}.route-origin-row strong,.route-return-row strong{display:block;margin-top:2px}.route-origin-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#fff;color:var(--primary)}.route-return-row>span:first-child{display:grid;place-items:center;width:34px;height:34px;font-size:20px;color:var(--muted)}
 .route-stops-v16{margin:2px 0}.route-estimate-card{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px;border:1px solid rgba(201,111,74,.22);border-radius:14px;background:#fff8f4}.route-estimate-card>div{display:flex;flex-direction:column;gap:3px}.route-estimate-card small{color:var(--muted)}.route-estimate-card strong{font-size:18px}.route-estimate-card p{grid-column:1/-1;margin:2px 0 0;color:var(--muted);font-size:12px;line-height:1.45}.route-error{margin-top:0}
 @media(max-width:760px){.trip-planning-block{padding:14px}.departure-location-grid{grid-template-columns:1fr}.route-estimate-card{grid-template-columns:1fr}.route-estimate-card p{grid-column:auto}.detected-destinations{padding:12px}}
+
+/* v1.7 — login refinement and one-way route planning */
+.auth-brand-lockup{display:flex;align-items:center;gap:14px;position:relative;z-index:1;width:max-content;max-width:100%}
+.auth-brand-lockup img{width:58px;height:58px;filter:none!important;opacity:1!important;object-fit:contain;flex:0 0 auto}
+.auth-brand-lockup span{font-size:28px;line-height:1;color:#fff;letter-spacing:-.8px;white-space:nowrap}
+.auth-brand-lockup strong{font-weight:800}
+.password-input-wrap{position:relative;display:block}
+.password-input-wrap input{width:100%;padding-right:48px}
+.password-visibility{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;display:grid;place-items:center;border:0;border-radius:10px;background:transparent;color:var(--muted);cursor:pointer;transition:background .18s ease,color .18s ease,transform .18s ease}
+.password-visibility svg{width:19px;height:19px}
+.password-visibility:hover{background:#F5F1ED;color:var(--graphite)}
+.password-visibility:active{transform:translateY(-50%) scale(.95)}
+.password-visibility:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+@media(max-width:900px){.auth-brand-lockup{display:none}}

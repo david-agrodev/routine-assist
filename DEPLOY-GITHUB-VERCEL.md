@@ -1,10 +1,10 @@
-# Deploy Routine Assist v1.6
+# Deploy Routine Assist v1.7
 
-Depois de executar a migration v1.6 no Supabase e validar localmente:
+Depois de executar a migration v1.7 no Supabase e validar localmente:
 
 ```bash
 git add .
-git commit -m "feat: Routine Assist v1.6"
+git commit -m "feat: Routine Assist v1.7"
 git push origin main
 ```
 

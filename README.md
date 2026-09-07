@@ -1,30 +1,24 @@
-# Routine Assist v1.6
+# Routine Assist v1.7
 
-Atualização de rota, ponto de partida, nomes automáticos de viagens unificadas e regra de conflito por viagem.
+Ajustes finais de rota e login.
 
 ## Novidades
 
-- **Origem** virou **Ponto de partida**.
-- Cidade/UF dos destinos continuam vindo das demandas; não são preenchidas novamente na viagem.
-- O Routine sugere nomes de viagem conforme os destinos vinculados:
-  - `Viagem Heliodora`
-  - `Viagem Heliodora • 2 atendimentos`
-  - `Viagem Inhumas + Aparecida de Goiânia`
-- Ao adicionar atendimento a uma viagem com nome automático, o nome é recalculado.
-- **Calcular rota aproximada** na tela da viagem:
-  - geocodificação de cidade via Open-Meteo;
-  - rota rodoviária via OSRM;
-  - distância e tempo estimados;
-  - cálculo considera retorno ao ponto de partida.
-- A estimativa usa os **centros das cidades**, pois o Routine ainda não exige coordenada/endereço exato da fazenda.
-- Conflitos antigos entre atendimentos da **mesma viagem** deixam de ser exibidos como conflito.
-- Ao editar datas de atendimentos já vinculados à mesma viagem, a sobreposição entre eles é permitida. Viagens diferentes continuam bloqueadas.
+- **Rota planejada somente de ida**:
+  - ponto de partida -> paradas/fazendas -> última parada;
+  - o retorno ao ponto de partida não entra mais na distância nem no tempo estimado;
+  - o bloco "Retorno considerado" foi removido da tela da viagem.
+- A migration `supabase/migration-v1.7.sql` limpa somente as estimativas antigas de rota, para evitar exibir valores de ida + volta salvos pela v1.6. Depois basta clicar em **Calcular/Recalcular rota**.
+- **Login corrigido**:
+  - identidade do Routine Assist aparece corretamente no painel escuro, sem o quadrado branco;
+  - o mesmo símbolo oficial é mantido no mobile;
+  - campo de senha ganhou botão personalizado de **mostrar/ocultar senha**.
 
 ## Atualização
 
 1. Preserve o seu `.env.local`.
-2. Rode `supabase/migration-v1.6.sql` no SQL Editor do Supabase.
-3. Substitua os arquivos pela v1.6.
+2. Rode `supabase/migration-v1.7.sql` no SQL Editor do Supabase.
+3. Substitua os arquivos pela v1.7.
 4. Rode:
 
 ```bash
@@ -37,6 +31,6 @@ npm run dev
 
 ```bash
 git add .
-git commit -m "feat: Routine Assist v1.6"
+git commit -m "feat: Routine Assist v1.7"
 git push origin main
 ```

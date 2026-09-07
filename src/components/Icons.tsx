@@ -29,3 +29,6 @@ export const ListIcon = (p:P) => <svg {...base} {...p}><path d="M9 7h10M9 12h10M
 export const CompassIcon = (p:P) => <svg {...base} {...p}><circle cx="12" cy="12" r="8"/><path d="m14.7 9.3-1.5 3.9-3.9 1.5 1.5-3.9Z"/></svg>
 export const SearchIcon = (p:P) => <svg {...base} {...p}><circle cx="10.5" cy="10.5" r="5.8"/><path d="m15 15 4.5 4.5"/></svg>
 export const ArchiveIcon = (p:P) => <svg {...base} {...p}><path d="M5 7h14v12H5z"/><path d="M4 4h16v3H4zM9 11h6"/></svg>
+
+export const EyeIcon = (p:P) => <svg {...base} {...p}><path d="M2.8 12s3.4-5.5 9.2-5.5 9.2 5.5 9.2 5.5-3.4 5.5-9.2 5.5S2.8 12 2.8 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+export const EyeOffIcon = (p:P) => <svg {...base} {...p}><path d="m4 4 16 16"/><path d="M9.2 6.9A9.8 9.8 0 0 1 12 6.5c5.8 0 9.2 5.5 9.2 5.5a15.5 15.5 0 0 1-3 3.5M14.7 14.7a3.7 3.7 0 0 1-5.4-5.4M6.1 8.1A16 16 0 0 0 2.8 12s3.4 5.5 9.2 5.5a9.7 9.7 0 0 0 3-.5"/></svg>

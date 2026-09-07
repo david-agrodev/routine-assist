@@ -1,8 +1,8 @@
-# Supabase — Routine Assist v1.6
+# Supabase — Routine Assist v1.7
 
 Para uma base que já está na v1.5, execute somente:
 
-`supabase/migration-v1.6.sql`
+`supabase/migration-v1.7.sql`
 
 A migration:
 

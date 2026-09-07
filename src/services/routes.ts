@@ -38,7 +38,6 @@ export async function calculateRouteEstimate(originLabel:string,appointments:App
   const points:GeoPoint[]=[]
   points.push(await geocode(origin.city,origin.state))
   for(const stop of destinations) points.push(await geocode(stop.city,stop.state))
-  points.push(points[0])
 
   const coords=points.map(p=>`${p.longitude},${p.latitude}`).join(';')
   const routeUrl=`https://router.project-osrm.org/route/v1/driving/${coords}?overview=false&steps=false`
@@ -50,6 +49,6 @@ export async function calculateRouteEstimate(originLabel:string,appointments:App
   return {
     distanceKm:Math.round((route.distance/1000)*10)/10,
     durationMinutes:Math.max(1,Math.round(route.duration/60)),
-    labels:[`${origin.city}${origin.state?`/${origin.state}`:''}`,...destinations.map(d=>`${d.city}${d.state?`/${d.state}`:''}`),`${origin.city}${origin.state?`/${origin.state}`:''}`],
+    labels:[`${origin.city}${origin.state?`/${origin.state}`:''}`,...destinations.map(d=>`${d.city}${d.state?`/${d.state}`:''}`)],
   }
 }
