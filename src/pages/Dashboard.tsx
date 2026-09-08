@@ -1,5 +1,6 @@
 import { differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { useNavigate } from 'react-router-dom'
 import { AlertIcon, ArrowIcon, CarIcon, CheckIcon, HotelIcon, RouteIcon } from '../components/Icons'
 import { WeekCalendar } from '../components/WeekCalendar'
 import { MobileAgenda } from '../components/MobileAgenda'
@@ -14,6 +15,7 @@ function greeting(){
 }
 
 export function Dashboard() {
+  const navigate = useNavigate()
   const { demands, trips, appointments, loading, error, notificationPreferences } = useRoutine()
   const activeTrips = trips.filter(t=>t.status==='planned')
   const pending = buildPendingItems(demands,activeTrips,notificationPreferences)
@@ -30,6 +32,20 @@ export function Dashboard() {
   const todayIso = format(new Date(),'yyyy-MM-dd')
   const todayAppointments = standaloneAppointments.filter(a=>a.start<=todayIso && a.end>=todayIso)
   const todayTrips = activeTrips.filter(t=>t.start<=todayIso && t.end>=todayIso)
+
+  const openPending = (item: ReturnType<typeof buildPendingItems>[number]) => {
+    if (item.target === '/viagens' && item.entityId) {
+      const focus = item.kind === 'hotel' ? '&focus=hotel' : item.kind === 'vehicle' ? '&focus=vehicle' : ''
+      navigate(`/viagens?trip=${encodeURIComponent(item.entityId)}${focus}`)
+      return
+    }
+    if (item.target === '/entrada' && item.entityId) {
+      try { window.localStorage.setItem('routine-assist-focus-demand', item.entityId) } catch { /* noop */ }
+      navigate('/entrada')
+      return
+    }
+    navigate(item.target)
+  }
 
   return <>
     <section className="page-heading"><div><span className="eyebrow">{dateLabel}</span><h1>{greeting()}</h1><p>Aqui está o que precisa da sua atenção.</p></div></section>
@@ -50,14 +66,14 @@ export function Dashboard() {
             <div className={hotelReady?'ok':'pending'}><HotelIcon/> {hotelReady?'Hospedagem organizada':'Hotel ainda não reservado'}</div>
             <div className={vehicleReady?'ok':'pending'}><CarIcon/> {vehicleReady?'Veículo solicitado/confirmado':'Veículo ainda não solicitado'}</div>
           </div>
-          <a className="text-link" href="/viagens">Ver viagem <ArrowIcon/></a>
+          <button className="text-link text-link-button" onClick={()=>navigate(`/viagens?trip=${encodeURIComponent(nextTrip.id)}`)}>Ver viagem <ArrowIcon/></button>
         </> : <div className="empty-inline"><p>Quando você criar uma viagem, hotel, veículo e atendimentos aparecerão aqui.</p><a className="text-link" href="/viagens">Abrir viagens <ArrowIcon/></a></div>}
       </section>
       <section className="panel attention">
         <div className="panel-head"><div><span className="eyebrow">Prioridade</span><h2>Precisa da sua atenção</h2></div></div>
         <div className="attention-list">
           {pending.length===0 && <div className="attention-empty"><CheckIcon/><div><strong>Tudo em ordem</strong><span>Nenhuma pendência automática agora.</span></div></div>}
-          {pending.slice(0,4).map(item=><div className="attention-item" key={item.id}><span className={`attention-dot ${item.urgency==='warn'?'amber':item.urgency}`}></span><div><strong>{item.title}</strong><span>{item.detail}</span></div><ArrowIcon/></div>)}
+          {pending.slice(0,4).map(item=><button type="button" className="attention-item attention-item-button" key={item.id} onClick={()=>openPending(item)} aria-label={`${item.title}: ${item.detail}`}><span className={`attention-dot ${item.urgency==='warn'?'amber':item.urgency}`}></span><div><strong>{item.title}</strong><span>{item.detail}</span></div><ArrowIcon/></button>)}
         </div>
       </section>
     </div>

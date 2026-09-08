@@ -1,3 +1,19 @@
+# Routine Assist v1.8
+
+Ajustes de uso real desta versão:
+
+- atendimentos vinculados a uma viagem agora podem ser abertos individualmente;
+- dentro da viagem, cada atendimento tem ações para **Editar / cancelar** e **Retirar da viagem**;
+- cancelar um atendimento remove apenas aquele compromisso, mantém a viagem com os demais e recalcula o nome/rota;
+- retirar da viagem mantém a demanda e o agendamento, deixando-o pronto para reorganização;
+- as setas da área **Precisa da sua atenção** no Dashboard agora são clicáveis e levam à demanda ou à viagem correta;
+- pendências de hotel e veículo abrem a viagem e rolam diretamente para o bloco correspondente;
+- o botão **Ver viagem** da próxima viagem abre a viagem específica.
+
+**Não há migration nova no Supabase para a v1.8.** A estrutura existente da v1.7 já suporta essas correções.
+
+---
+
 # Routine Assist v1.7
 
 Ajustes finais de rota e login.

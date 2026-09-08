@@ -20,6 +20,7 @@ import { LodgingModal } from '../components/LodgingModal'
 import { VehicleModal } from '../components/VehicleModal'
 import { ConfirmActionModal } from '../components/ConfirmActionModal'
 import { EditTripModal } from '../components/EditTripModal'
+import { DemandDetailModal } from '../components/DemandDetailModal'
 import { useRoutine } from '../context/RoutineContext'
 import { VEHICLE_FORM_URL } from '../lib/constants'
 import { formatDateRange, formatMoney } from '../lib/format'
@@ -31,9 +32,10 @@ import { calculateRouteEstimate } from '../services/routes'
 import type { Lodging, Trip } from '../types/routine'
 
 export function TripsPage(){
-  const { trips, demands, loading, deleteTrip, completeTrip, saveTripRoute } = useRoutine()
+  const { trips, demands, loading, deleteTrip, completeTrip, saveTripRoute, unlinkAppointmentFromTrip } = useRoutine()
   const [searchParams,setSearchParams] = useSearchParams()
   const queryTripId = searchParams.get('trip')
+  const focusSection = searchParams.get('focus')
   const [createOpen,setCreateOpen]=useState(false)
   const [selectedId,setSelectedId]=useState<string|null>(queryTripId || null)
   const [lodgingTrip,setLodgingTrip]=useState<Trip|null>(null)
@@ -49,11 +51,16 @@ export function TripsPage(){
   const [completeError,setCompleteError]=useState<string|null>(null)
   const [routeBusy,setRouteBusy]=useState(false)
   const [routeError,setRouteError]=useState<string|null>(null)
+  const [appointmentDemandId,setAppointmentDemandId]=useState<string|null>(null)
+  const [unlinkTarget,setUnlinkTarget]=useState<{appointmentId:string;label:string}|null>(null)
+  const [unlinkBusy,setUnlinkBusy]=useState(false)
+  const [unlinkError,setUnlinkError]=useState<string|null>(null)
   const [tripTab,setTripTab]=useState<'upcoming'|'ongoing'|'history'>(()=>(window.localStorage.getItem('routine-assist-trip-tab') as any)||'upcoming')
   const todayIso=format(new Date(),'yyyy-MM-dd')
   const sorted=useMemo(()=>[...trips].sort((a,b)=>a.start.localeCompare(b.start)),[trips])
   const tabTrips=useMemo(()=>sorted.filter(t=>tripTab==='history' ? t.status==='completed' : tripTab==='ongoing' ? t.status==='planned' && t.start<=todayIso : t.status==='planned' && t.start>todayIso),[sorted,tripTab,todayIso])
   const selected=selectedId ? sorted.find(t=>t.id===selectedId) || null : null
+  const appointmentDemand=appointmentDemandId ? demands.find(d=>d.id===appointmentDemandId) || null : null
 
   useEffect(()=>{
     if (queryTripId) return
@@ -86,6 +93,13 @@ export function TripsPage(){
       setSearchParams({})
     }
   },[selectedId,sorted,setSearchParams])
+
+  useEffect(()=>{
+    if (!selectedId || !focusSection) return
+    const id = focusSection === 'hotel' ? 'trip-hotel-card' : focusSection === 'vehicle' ? 'trip-vehicle-card' : 'trip-selected-detail'
+    const timer = window.setTimeout(()=>document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'center'}),120)
+    return ()=>window.clearTimeout(timer)
+  },[selectedId,focusSection])
 
   useEffect(()=>{ try { window.localStorage.setItem('routine-assist-trip-tab',tripTab) } catch { /* noop */ } },[tripTab])
 
@@ -146,6 +160,16 @@ export function TripsPage(){
       await saveTripRoute({tripId:selected.id,distanceKm:estimate.distanceKm,durationMinutes:estimate.durationMinutes})
     }catch(e:any){setRouteError(e?.message||'Não foi possível calcular a rota agora.')}
     finally{setRouteBusy(false)}
+  }
+
+  const unlinkSelectedAppointment = async () => {
+    if (!selected || !unlinkTarget || unlinkBusy) return
+    setUnlinkBusy(true); setUnlinkError(null)
+    try {
+      await unlinkAppointmentFromTrip(selected.id, unlinkTarget.appointmentId)
+      setUnlinkTarget(null)
+    } catch (e:any) { setUnlinkError(e?.message || 'Não foi possível retirar o atendimento desta viagem.') }
+    finally { setUnlinkBusy(false) }
   }
 
   const browser=<section id="trip-browser" className="panel trip-browser trip-browser-v14">
@@ -213,12 +237,12 @@ export function TripsPage(){
         <article className="trip-work-card appointments-card">
           <div className="trip-work-card-head"><span className="trip-card-icon plum"><ListIcon/></span><div><span className="section-label">Atendimentos</span><h3>{selected.appointments.length ? `${selected.appointments.length} vinculado${selected.appointments.length===1?'':'s'}` : 'Nenhum atendimento'}</h3></div></div>
           <div className="trip-work-card-body">
-            {selected.appointments.length ? selected.appointments.map(a=><div className="appointment-row appointment-row-v14" key={a.id}><div><strong>{a.farmName || a.client}</strong><span>{a.farmName ? `${a.client} • ` : ''}{[a.city,a.state].filter(Boolean).join('/') || 'Local não informado'}</span></div><b>{formatDateRange(a.start,a.end)}</b></div>) : <p className="trip-empty-copy">Vincule os atendimentos que fazem parte deste deslocamento.</p>}
+            {selected.appointments.length ? selected.appointments.map(a=><div className="appointment-row appointment-row-v18" key={a.id}><div className="appointment-row-main"><strong>{a.farmName || a.client}</strong><span>{a.farmName ? `${a.client} • ` : ''}{[a.city,a.state].filter(Boolean).join('/') || 'Local não informado'}</span></div><div className="appointment-row-side"><b>{formatDateRange(a.start,a.end)}</b><div className="appointment-row-actions">{a.demandId&&<button className="mini-link-button" onClick={()=>setAppointmentDemandId(a.demandId!)}><EditIcon/> Editar / cancelar</button>}<button className="mini-link-button danger" onClick={()=>{setUnlinkError(null);setUnlinkTarget({appointmentId:a.id,label:a.farmName || a.client})}}>Retirar da viagem</button></div></div></div>) : <p className="trip-empty-copy">Vincule os atendimentos que fazem parte deste deslocamento.</p>}
           </div>
           <div className="trip-work-card-actions"><button className="secondary compact no-margin" onClick={()=>setLinkTrip(selected)}><PlusIcon/> Adicionar atendimento</button></div>
         </article>
 
-        <article className={`trip-work-card lodging-card ${hotelReady?'is-ready':'needs-action'}`}>
+        <article id="trip-hotel-card" className={`trip-work-card lodging-card ${hotelReady?'is-ready':'needs-action'}`}>
           <div className="trip-work-card-head"><span className={`trip-card-icon ${hotelReady?'neutral':'warn'}`}><HotelIcon/></span><div><span className="section-label">Hospedagem</span><h3>{selected.hotelRequired ? selected.lodgings.length ? 'Hospedagem cadastrada' : 'Hotel pendente' : 'Não necessária'}</h3></div>{hotelReady&&<span className="ready-pill"><CheckIcon/> Organizado</span>}</div>
           <div className="trip-work-card-body">
             {selected.hotelRequired ? selected.lodgings.length ? selected.lodgings.map((stay,index)=>{
@@ -234,7 +258,7 @@ export function TripsPage(){
           {selected.hotelRequired&&<div className="trip-work-card-actions"><button className={selected.lodgings.length?'secondary compact no-margin':'primary compact no-margin'} onClick={()=>{setEditingLodging(null);setLodgingTrip(selected)}}><HotelIcon/> {selected.lodgings.length?'Adicionar hospedagem':'Cadastrar hospedagem'}</button></div>}
         </article>
 
-        <article className={`trip-work-card vehicle-card ${vehicleReady?'is-ready':'needs-action'}`}>
+        <article id="trip-vehicle-card" className={`trip-work-card vehicle-card ${vehicleReady?'is-ready':'needs-action'}`}>
           <div className="trip-work-card-head"><span className={`trip-card-icon ${vehicleReady?'neutral':'terracotta'}`}><CarIcon/></span><div><span className="section-label">Veículo</span><h3>{selected.vehicleRequired ? vehicle ? vehicle.status==='confirmed'?'Reserva confirmada':vehicle.status==='requested'?'Solicitação enviada':vehicle.status==='picked_up'?'Veículo retirado':vehicle.status==='returned'?'Veículo devolvido':'Veículo registrado' : 'Solicitação pendente' : 'Não necessário'}</h3></div>{vehicleReady&&<span className="ready-pill"><CheckIcon/> Organizado</span>}</div>
           <div className="trip-work-card-body">
             {selected.vehicleRequired ? vehicle ? <div className="vehicle-summary-v14"><div className="vehicle-company"><CarIcon/><div><small>Locadora</small><strong>{vehicle.company || 'Ainda não definida'}</strong></div></div><div className="vehicle-stat-grid">{vehicle.locator&&<span><small>Localizador</small><strong>{vehicle.locator}</strong></span>}{vehicle.requestedAt&&<span><small>Solicitado em</small><strong>{new Date(vehicle.requestedAt).toLocaleDateString('pt-BR')}</strong></span>}{vehicle.pickupLocation&&<span><small>Retirada</small><strong>{vehicle.pickupLocation}</strong></span>}</div></div> : <p className="trip-empty-copy">Abra o Forms corporativo para solicitar o veículo e depois atualize o status no Routine.</p> : <p className="trip-empty-copy">Esta viagem não exige reserva de veículo.</p>}
@@ -262,6 +286,18 @@ export function TripsPage(){
     <LodgingModal trip={lodgingTrip} lodging={editingLodging} onClose={()=>{setLodgingTrip(null);setEditingLodging(null)}}/>
     <VehicleModal trip={vehicleTrip} onClose={()=>setVehicleTrip(null)}/>
     <LinkAppointmentsModal trip={linkTrip} onClose={()=>setLinkTrip(null)}/>
+    <DemandDetailModal demand={appointmentDemand} initialTab="schedule" onClose={()=>setAppointmentDemandId(null)}/>
+    <ConfirmActionModal
+      open={Boolean(unlinkTarget)}
+      title="Retirar atendimento da viagem?"
+      description={`${unlinkTarget?.label || 'Este atendimento'} deixará de fazer parte de “${tripDisplayTitle(selected)}”.`}
+      detail="O agendamento e a demanda continuam existindo. O Routine atualizará o nome e a rota da viagem com os atendimentos restantes."
+      confirmLabel="Retirar da viagem"
+      busy={unlinkBusy}
+      error={unlinkError}
+      onCancel={()=>!unlinkBusy&&setUnlinkTarget(null)}
+      onConfirm={()=>void unlinkSelectedAppointment()}
+    />
     <ConfirmActionModal
       open={completeOpen}
       title="Concluir viagem?"

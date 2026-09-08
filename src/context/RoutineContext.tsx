@@ -6,6 +6,7 @@ import {
   createAppointmentFromDemand,
   createDemand as createDemandDb,
   completeTrip as completeTripDb,
+  cancelAppointment as cancelAppointmentDb,
   deleteDemand as deleteDemandDb,
   deleteTrip as deleteTripDb,
   createTrip as createTripDb,
@@ -16,6 +17,7 @@ import {
   getDemands,
   getTrips,
   linkAppointmentsToTrip as linkAppointmentsToTripDb,
+  unlinkAppointmentFromTrip as unlinkAppointmentFromTripDb,
   saveVehicleReservation as saveVehicleReservationDb,
   saveTripRoute as saveTripRouteDb,
   saveNotificationPreferences as saveNotificationPreferencesDb,
@@ -57,12 +59,14 @@ type RoutineContextValue = {
   deleteDemand: (demandId: string) => Promise<void>
   deleteTrip: (tripId: string) => Promise<void>
   completeTrip: (tripId: string) => Promise<void>
+  cancelAppointment: (appointmentId: string, demandId?: string) => Promise<void>
   checkAppointmentConflicts: (start: string, end: string, excludeAppointmentId?: string) => Promise<AppointmentConflict[]>
   scheduleDemand: (input: CreateAppointmentInput) => Promise<Appointment>
   updateAppointment: (input: UpdateAppointmentInput) => Promise<Appointment>
   createTrip: (input: CreateTripInput) => Promise<string>
   updateTrip: (input: UpdateTripInput) => Promise<void>
   linkAppointmentsToTrip: (tripId: string, appointmentIds: string[]) => Promise<void>
+  unlinkAppointmentFromTrip: (tripId: string, appointmentId: string) => Promise<void>
   addLodging: (input: AddLodgingInput) => Promise<void>
   saveVehicleReservation: (input: SaveVehicleInput) => Promise<void>
   saveTripRoute: (input: SaveTripRouteInput) => Promise<void>
@@ -144,6 +148,12 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     await refresh()
   }
 
+  const cancelAppointment = async (appointmentId: string, demandId?: string) => {
+    if (!workspaceId) throw new Error('Workspace indisponível.')
+    await cancelAppointmentDb(workspaceId, appointmentId, demandId)
+    await refresh()
+  }
+
   const checkAppointmentConflicts = async (start: string, end: string, excludeAppointmentId?: string) => {
     if (!user) throw new Error('Usuário indisponível.')
     return checkAppointmentConflictsDb(user.id, start, end, excludeAppointmentId)
@@ -189,6 +199,12 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     await refresh()
   }
 
+  const unlinkAppointmentFromTrip = async (tripId: string, appointmentId: string) => {
+    if (!workspaceId) throw new Error('Workspace indisponível.')
+    await unlinkAppointmentFromTripDb(workspaceId, tripId, appointmentId)
+    await refresh()
+  }
+
   const addLodging = async (input: AddLodgingInput) => {
     if (!workspaceId) throw new Error('Workspace indisponível.')
     await addLodgingDb(workspaceId, input)
@@ -215,8 +231,8 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(() => ({
     demands, trips, appointments, companies, hotels, notificationPreferences, loading, error, refresh,
-    createDemand, updateDemand, deleteDemand, deleteTrip, completeTrip, checkAppointmentConflicts, scheduleDemand, updateAppointment,
-    createTrip, updateTrip, linkAppointmentsToTrip, addLodging, saveVehicleReservation, saveTripRoute, saveNotificationPreferences,
+    createDemand, updateDemand, deleteDemand, deleteTrip, completeTrip, cancelAppointment, checkAppointmentConflicts, scheduleDemand, updateAppointment,
+    createTrip, updateTrip, linkAppointmentsToTrip, unlinkAppointmentFromTrip, addLodging, saveVehicleReservation, saveTripRoute, saveNotificationPreferences,
   }), [demands, trips, appointments, companies, hotels, notificationPreferences, loading, error, refresh])
 
   return <RoutineContext.Provider value={value}>{children}</RoutineContext.Provider>

@@ -30,8 +30,8 @@ type Draft = {
   confirmed: boolean
 }
 
-export function DemandDetailModal({ demand, onClose }: { demand: Demand | null; onClose: () => void }) {
-  const { companies, appointments, trips, updateDemand, deleteDemand, checkAppointmentConflicts, scheduleDemand, updateAppointment } = useRoutine()
+export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Demand | null; onClose: () => void; initialTab?: 'info'|'schedule' }) {
+  const { companies, appointments, trips, updateDemand, deleteDemand, cancelAppointment, checkAppointmentConflicts, scheduleDemand, updateAppointment } = useRoutine()
   const [tab, setTab] = useState<'info'|'schedule'>('info')
   const [client, setClient] = useState('')
   const [company, setCompany] = useState('')
@@ -54,6 +54,8 @@ export function DemandDetailModal({ demand, onClose }: { demand: Demand | null; 
   const [checked, setChecked] = useState(false)
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [cancelAppointmentOpen, setCancelAppointmentOpen] = useState(false)
+  const [cancelAppointmentError, setCancelAppointmentError] = useState<string | null>(null)
   const [holidayPrompt, setHolidayPrompt] = useState<{ holidays: Holiday[]; mode: 'create'|'edit'; unavailable?: boolean } | null>(null)
   const initializedFor = useRef<string | null>(null)
 
@@ -68,7 +70,7 @@ export function DemandDetailModal({ demand, onClose }: { demand: Demand | null; 
     if (!demand) { initializedFor.current = null; setCreatedAppointment(null); return }
     let draft: Partial<Draft> | null = null
     try { draft = JSON.parse(window.localStorage.getItem(draftKey(demand.id)) || 'null') } catch { draft = null }
-    setTab(draft?.tab || 'info')
+    setTab(initialTab || draft?.tab || 'info')
     setClient(draft?.client ?? demand.client)
     setCompany(draft?.company ?? demand.company)
     setRegional(draft?.regional ?? demand.regional ?? '')
@@ -83,7 +85,7 @@ export function DemandDetailModal({ demand, onClose }: { demand: Demand | null; 
     setEnd(draft?.end ?? existingAppointment?.end ?? '')
     setType(draft?.type ?? (existingAppointment?.type === 'Remoto' ? 'Remoto' : 'Presencial'))
     setConfirmed(draft?.confirmed ?? Boolean(existingAppointment?.clientConfirmed ?? existingAppointment))
-    setConflicts([]); setChecked(false); setError(null); setCreatedAppointment(null); setDeleteOpen(false); setEditingAppointment(false)
+    setConflicts([]); setChecked(false); setError(null); setCreatedAppointment(null); setDeleteOpen(false); setCancelAppointmentOpen(false); setCancelAppointmentError(null); setEditingAppointment(false)
     initializedFor.current = demand.id
   }, [demand?.id, existingAppointment?.id])
 
@@ -156,6 +158,19 @@ export function DemandDetailModal({ demand, onClose }: { demand: Demand | null; 
       setDeleteOpen(false)
       onClose()
     } catch (e:any) { setError(e?.message || 'Não foi possível excluir a demanda.') }
+    finally { setBusy(false) }
+  }
+
+  const cancelScheduledAppointment = async () => {
+    if (!appointment || busy) return
+    setBusy(true); setCancelAppointmentError(null)
+    try {
+      await cancelAppointment(appointment.id, demand.id)
+      setCreatedAppointment(null)
+      setEditingAppointment(false)
+      setCancelAppointmentOpen(false)
+      setTab('info')
+    } catch (e:any) { setCancelAppointmentError(e?.message || 'Não foi possível cancelar o atendimento.') }
     finally { setBusy(false) }
   }
 
@@ -338,7 +353,7 @@ export function DemandDetailModal({ demand, onClose }: { demand: Demand | null; 
             <div className="scheduled-summary">
               <span className="section-icon neutral"><CheckIcon/></span>
               <div className="grow"><span className="eyebrow">Atendimento agendado</span><h3>{appointment.farmName || appointment.client}</h3><p>{appointment.client}{appointment.farmName ? ' • ' : ''}{[appointment.city,appointment.state].filter(Boolean).join('/')} • {formatDateRange(appointment.start,appointment.end)} • {appointment.type}</p></div>
-              <button className="secondary compact" onClick={beginAppointmentEdit}><EditIcon/> Editar agendamento</button>
+              <div className="scheduled-summary-actions"><button className="secondary compact" onClick={beginAppointmentEdit}><EditIcon/> Editar agendamento</button><button className="danger-soft compact" onClick={()=>{setCancelAppointmentError(null);setCancelAppointmentOpen(true)}}><TrashIcon/> Cancelar atendimento</button></div>
             </div>
             {appointment.type === 'Presencial' ? <TravelSetupPanel appointment={appointment} onFinish={onClose}/> : <div className="remote-success"><CheckIcon/><div><strong>Pronto.</strong><span>Como o atendimento é remoto, não é necessário criar viagem, hotel ou veículo.</span></div></div>}
           </> : scheduleEditor(Boolean(appointment && editingAppointment))}
@@ -356,6 +371,18 @@ export function DemandDetailModal({ demand, onClose }: { demand: Demand | null; 
       busy={busy}
       onCancel={()=>!busy&&setHolidayPrompt(null)}
       onConfirm={()=>{const mode=holidayPrompt?.mode;setHolidayPrompt(null);if(mode==='edit')void saveExisting();else if(mode==='create')void createSchedule()}}
+    />
+
+    <ConfirmActionModal
+      open={cancelAppointmentOpen}
+      title="Cancelar atendimento?"
+      description={`${appointment?.farmName || demand.client} será retirado da Agenda${linkedTrip ? ` e da “${tripDisplayTitle(linkedTrip)}”` : ''}.`}
+      detail={linkedTrip ? 'A viagem continuará existindo com os demais atendimentos. O nome e a rota serão atualizados automaticamente. A demanda ficará no histórico como cancelada.' : 'A demanda ficará no histórico como cancelada. Você poderá criar um novo agendamento depois, se necessário.'}
+      confirmLabel="Cancelar atendimento"
+      busy={busy}
+      error={cancelAppointmentError}
+      onCancel={()=>!busy&&setCancelAppointmentOpen(false)}
+      onConfirm={()=>void cancelScheduledAppointment()}
     />
 
     <ConfirmActionModal

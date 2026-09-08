@@ -486,6 +486,133 @@ export async function linkAppointmentsToTrip(
 
 
 
+
+async function refreshTripAfterAppointmentRemoval(workspaceId: string, tripId: string): Promise<void> {
+  const client = requireClient()
+  const { data: trip, error: tripError } = await client
+    .from('trips')
+    .select('title')
+    .eq('workspace_id', workspaceId)
+    .eq('id', tripId)
+    .maybeSingle()
+  if (tripError) throw tripError
+  if (!trip) return
+
+  const { data: links, error: linksError } = await client
+    .from('trip_appointments')
+    .select('sort_order,appointments(id,title,farm_name_snapshot,city_snapshot,state_snapshot,demand_id)')
+    .eq('trip_id', tripId)
+  if (linksError) throw linksError
+
+  const ordered = (links ?? [])
+    .sort((a:any,b:any)=>(a.sort_order ?? 0) - (b.sort_order ?? 0))
+    .map((link:any)=>link.appointments)
+    .filter(Boolean)
+
+  const payload:any = {
+    route_distance_km: null,
+    route_duration_minutes: null,
+    route_calculated_at: null,
+  }
+  const autoTitle = /^Viagem\s+/i.test(trip.title || '') || /^Nova viagem$/i.test(trip.title || '')
+  if (autoTitle && ordered.length) {
+    payload.title = suggestedTripTitle(ordered.map((a:any)=>({
+      client:a.title || '',
+      farmName:a.farm_name_snapshot || undefined,
+      city:a.city_snapshot || undefined,
+      state:a.state_snapshot || undefined,
+    })) as any)
+  }
+  const { error: updateError } = await client
+    .from('trips')
+    .update(payload)
+    .eq('workspace_id', workspaceId)
+    .eq('id', tripId)
+  if (updateError) throw updateError
+}
+
+export async function unlinkAppointmentFromTrip(
+  workspaceId: string,
+  tripId: string,
+  appointmentId: string,
+): Promise<void> {
+  const client = requireClient()
+  const { data: appointment, error: appointmentError } = await client
+    .from('appointments')
+    .select('demand_id')
+    .eq('workspace_id', workspaceId)
+    .eq('id', appointmentId)
+    .maybeSingle()
+  if (appointmentError) throw appointmentError
+
+  const { error } = await client
+    .from('trip_appointments')
+    .delete()
+    .eq('trip_id', tripId)
+    .eq('appointment_id', appointmentId)
+  if (error) throw error
+
+  await refreshTripAfterAppointmentRemoval(workspaceId, tripId)
+
+  if (appointment?.demand_id) {
+    const { data: remainingLinks, error: remainingError } = await client
+      .from('trip_appointments')
+      .select('trip_id')
+      .eq('appointment_id', appointmentId)
+      .limit(1)
+    if (remainingError) throw remainingError
+    if (!remainingLinks?.length) {
+      const { error: demandError } = await client
+        .from('demands')
+        .update({ status:'scheduled', next_step:'Organizar viagem' })
+        .eq('workspace_id', workspaceId)
+        .eq('id', appointment.demand_id)
+      if (demandError) throw demandError
+    }
+  }
+}
+
+export async function cancelAppointment(
+  workspaceId: string,
+  appointmentId: string,
+  demandId?: string,
+): Promise<void> {
+  const client = requireClient()
+  const { data: links, error: linksError } = await client
+    .from('trip_appointments')
+    .select('trip_id')
+    .eq('appointment_id', appointmentId)
+  if (linksError) throw linksError
+  const tripIds: string[] = Array.from(new Set<string>((links ?? []).map((l:any)=>String(l.trip_id))))
+
+  const { data: appointment, error: appointmentError } = await client
+    .from('appointments')
+    .select('demand_id')
+    .eq('workspace_id', workspaceId)
+    .eq('id', appointmentId)
+    .maybeSingle()
+  if (appointmentError) throw appointmentError
+
+  const { error: deleteError } = await client
+    .from('appointments')
+    .delete()
+    .eq('workspace_id', workspaceId)
+    .eq('id', appointmentId)
+  if (deleteError) throw deleteError
+
+  const targetDemandId = demandId || appointment?.demand_id
+  if (targetDemandId) {
+    const { error: demandError } = await client
+      .from('demands')
+      .update({ status:'cancelled', next_step:'Atendimento cancelado' })
+      .eq('workspace_id', workspaceId)
+      .eq('id', targetDemandId)
+    if (demandError) throw demandError
+  }
+
+  for (const tripId of tripIds) await refreshTripAfterAppointmentRemoval(workspaceId, tripId)
+}
+
 export async function updateAppointment(
   workspaceId: string,
   user: User,
