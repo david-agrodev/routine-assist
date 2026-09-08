@@ -17,3 +17,8 @@ export function isVehicleReady(trip: Trip): boolean {
   if (!trip.vehicleRequired) return true
   return trip.vehicles.some(v=>['requested','confirmed','picked_up','returned'].includes(v.status))
 }
+
+export function isFlightReady(trip: Trip): boolean {
+  if (!trip.flightRequired) return true
+  return trip.flights.some(f=>f.status==='confirmed')
+}

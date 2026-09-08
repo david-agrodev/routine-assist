@@ -14,16 +14,19 @@ import {
   getCompanies,
   getHotels,
   getNotificationPreferences,
+  getUserProfile,
   getDemands,
   getTrips,
   linkAppointmentsToTrip as linkAppointmentsToTripDb,
   unlinkAppointmentFromTrip as unlinkAppointmentFromTripDb,
   saveVehicleReservation as saveVehicleReservationDb,
+  saveFlightReservation as saveFlightReservationDb,
   saveTripRoute as saveTripRouteDb,
   saveNotificationPreferences as saveNotificationPreferencesDb,
   updateDemand as updateDemandDb,
   updateAppointment as updateAppointmentDb,
   updateTrip as updateTripDb,
+  updateUserProfile as updateUserProfileDb,
 } from '../services/routine'
 import type {
   AddLodgingInput,
@@ -37,8 +40,11 @@ import type {
   Hotel,
   NotificationPreferences,
   SaveVehicleInput,
+  SaveFlightInput,
   SaveTripRouteInput,
   Trip,
+  UserProfile,
+  UpdateUserProfileInput,
   UpdateDemandInput,
   UpdateAppointmentInput,
   UpdateTripInput,
@@ -51,6 +57,7 @@ type RoutineContextValue = {
   companies: Company[]
   hotels: Hotel[]
   notificationPreferences: NotificationPreferences
+  userProfile: UserProfile | null
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
@@ -69,8 +76,10 @@ type RoutineContextValue = {
   unlinkAppointmentFromTrip: (tripId: string, appointmentId: string) => Promise<void>
   addLodging: (input: AddLodgingInput) => Promise<void>
   saveVehicleReservation: (input: SaveVehicleInput) => Promise<void>
+  saveFlightReservation: (input: SaveFlightInput) => Promise<void>
   saveTripRoute: (input: SaveTripRouteInput) => Promise<void>
   saveNotificationPreferences: (prefs: NotificationPreferences) => Promise<void>
+  updateUserProfile: (input: UpdateUserProfileInput) => Promise<void>
 }
 
 const RoutineContext = createContext<RoutineContextValue | null>(null)
@@ -83,6 +92,7 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([])
   const [hotels, setHotels] = useState<Hotel[]>([])
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({ alertDays:[14,7,3,1], inAppEnabled:true, pushEnabled:false })
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -91,13 +101,14 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      const [d, t, a, c, h, prefs] = await Promise.all([
+      const [d, t, a, c, h, prefs, profile] = await Promise.all([
         getDemands(workspaceId),
         getTrips(workspaceId),
         getAppointments(workspaceId),
         getCompanies(workspaceId),
         getHotels(workspaceId),
         user ? getNotificationPreferences(user.id) : Promise.resolve({ alertDays:[14,7,3,1], inAppEnabled:true, pushEnabled:false }),
+        user ? getUserProfile(user.id) : Promise.resolve(null),
       ])
       setDemands(d)
       setTrips(t)
@@ -105,6 +116,7 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
       setCompanies(c)
       setHotels(h)
       setNotificationPreferences(prefs)
+      setUserProfile(profile)
     } catch (err: any) {
       setError(err?.message || 'Não foi possível carregar os dados.')
     } finally {
@@ -217,6 +229,12 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     await refresh()
   }
 
+  const saveFlightReservation = async (input: SaveFlightInput) => {
+    if (!workspaceId) throw new Error('Workspace indisponível.')
+    await saveFlightReservationDb(workspaceId, input)
+    await refresh()
+  }
+
   const saveTripRoute = async (input: SaveTripRouteInput) => {
     if (!workspaceId) throw new Error('Workspace indisponível.')
     await saveTripRouteDb(workspaceId, input)
@@ -229,11 +247,17 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     setNotificationPreferences(prefs)
   }
 
+  const updateUserProfile = async (input: UpdateUserProfileInput) => {
+    if (!user) throw new Error('Usuário indisponível.')
+    const updated = await updateUserProfileDb(user.id, input)
+    setUserProfile(updated)
+  }
+
   const value = useMemo(() => ({
-    demands, trips, appointments, companies, hotels, notificationPreferences, loading, error, refresh,
+    demands, trips, appointments, companies, hotels, notificationPreferences, userProfile, loading, error, refresh,
     createDemand, updateDemand, deleteDemand, deleteTrip, completeTrip, cancelAppointment, checkAppointmentConflicts, scheduleDemand, updateAppointment,
-    createTrip, updateTrip, linkAppointmentsToTrip, unlinkAppointmentFromTrip, addLodging, saveVehicleReservation, saveTripRoute, saveNotificationPreferences,
-  }), [demands, trips, appointments, companies, hotels, notificationPreferences, loading, error, refresh])
+    createTrip, updateTrip, linkAppointmentsToTrip, unlinkAppointmentFromTrip, addLodging, saveVehicleReservation, saveFlightReservation, saveTripRoute, saveNotificationPreferences, updateUserProfile,
+  }), [demands, trips, appointments, companies, hotels, notificationPreferences, userProfile, loading, error, refresh])
 
   return <RoutineContext.Provider value={value}>{children}</RoutineContext.Provider>
 }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { bootstrapWorkspace } from '../services/routine'
@@ -22,14 +22,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [setupError, setSetupError] = useState<string | null>(null)
+  const activeUserRef = useRef<string | null>(null)
+  const workspaceRef = useRef<string | null>(null)
 
-  const prepare = async (activeSession: Session | null) => {
+  const bootstrap = async (activeSession: Session | null, force = false) => {
+    if (!activeSession) {
+      activeUserRef.current = null
+      workspaceRef.current = null
+      setSession(null)
+      setWorkspaceId(null)
+      setSetupError(null)
+      return
+    }
+
+    const userId = activeSession.user.id
     setSession(activeSession)
-    setWorkspaceId(null)
     setSetupError(null)
-    if (!activeSession) return
+
+    // Refresh de token / retorno para a aba não desmonta mais o app.
+    if (!force && activeUserRef.current === userId && workspaceRef.current) return
+
     try {
       const ws = await bootstrapWorkspace()
+      activeUserRef.current = userId
+      workspaceRef.current = ws
       setWorkspaceId(ws)
     } catch (error: any) {
       setSetupError(error?.message || 'Não foi possível preparar o banco do Routine Assist.')
@@ -42,19 +58,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
     let mounted = true
-    supabase.auth.getSession().then(async ({ data }) => {
+
+    void supabase.auth.getSession().then(async ({ data }) => {
       if (!mounted) return
-      await prepare(data.session)
+      await bootstrap(data.session, true)
       if (mounted) setLoading(false)
     })
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      window.setTimeout(async () => {
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      window.setTimeout(() => {
         if (!mounted) return
-        setLoading(true)
-        await prepare(nextSession)
-        if (mounted) setLoading(false)
+        if (event === 'SIGNED_OUT' || !nextSession) {
+          void bootstrap(null)
+          return
+        }
+        // TOKEN_REFRESHED, USER_UPDATED e retorno de foco preservam a tela atual.
+        void bootstrap(nextSession)
       }, 0)
     })
+
     return () => {
       mounted = false
       listener.subscription.unsubscribe()
@@ -74,11 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     signUp: async (name, email, password) => {
       if (!supabase) throw new Error('Supabase não configurado.')
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: name } },
-      })
+      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } })
       if (error) throw error
       return { needsConfirmation: !data.session }
     },
@@ -88,13 +106,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error
     },
     retryBootstrap: async () => {
-      setLoading(true)
       setSetupError(null)
-      try {
-        if (session) await prepare(session)
-      } finally {
-        setLoading(false)
-      }
+      if (session) await bootstrap(session, true)
     },
   }), [session, workspaceId, loading, setupError])
 

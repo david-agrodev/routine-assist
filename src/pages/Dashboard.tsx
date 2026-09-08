@@ -1,12 +1,12 @@
 import { differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
-import { AlertIcon, ArrowIcon, CarIcon, CheckIcon, HotelIcon, RouteIcon } from '../components/Icons'
+import { AlertIcon, ArrowIcon, CarIcon, CheckIcon, HotelIcon, PlaneIcon, RouteIcon } from '../components/Icons'
 import { WeekCalendar } from '../components/WeekCalendar'
 import { MobileAgenda } from '../components/MobileAgenda'
 import { useRoutine } from '../context/RoutineContext'
 import { buildPendingItems } from '../lib/pending'
-import { isHotelReady, isVehicleReady } from '../lib/tripReadiness'
+import { isFlightReady, isHotelReady, isVehicleReady } from '../lib/tripReadiness'
 import { tripDisplayTitle } from '../lib/tripTitle'
 
 function greeting(){
@@ -29,13 +29,14 @@ export function Dashboard() {
   const dateLabel = format(new Date(),"EEEE, d 'de' MMMM",{locale:ptBR})
   const hotelReady = nextTrip ? isHotelReady(nextTrip) : false
   const vehicleReady = nextTrip ? isVehicleReady(nextTrip) : false
+  const flightReady = nextTrip ? isFlightReady(nextTrip) : false
   const todayIso = format(new Date(),'yyyy-MM-dd')
   const todayAppointments = standaloneAppointments.filter(a=>a.start<=todayIso && a.end>=todayIso)
   const todayTrips = activeTrips.filter(t=>t.start<=todayIso && t.end>=todayIso)
 
   const openPending = (item: ReturnType<typeof buildPendingItems>[number]) => {
     if (item.target === '/viagens' && item.entityId) {
-      const focus = item.kind === 'hotel' ? '&focus=hotel' : item.kind === 'vehicle' ? '&focus=vehicle' : ''
+      const focus = item.kind === 'hotel' ? '&focus=hotel' : item.kind === 'vehicle' ? '&focus=vehicle' : item.kind === 'flight' ? '&focus=flight' : ''
       navigate(`/viagens?trip=${encodeURIComponent(item.entityId)}${focus}`)
       return
     }
@@ -65,6 +66,7 @@ export function Dashboard() {
             <div className={nextTrip.appointments.length ? 'ok':'pending'}><CheckIcon/> {nextTrip.appointments.length ? 'Atendimentos vinculados':'Nenhum atendimento vinculado'}</div>
             <div className={hotelReady?'ok':'pending'}><HotelIcon/> {hotelReady?'Hospedagem organizada':'Hotel ainda não reservado'}</div>
             <div className={vehicleReady?'ok':'pending'}><CarIcon/> {vehicleReady?'Veículo solicitado/confirmado':'Veículo ainda não solicitado'}</div>
+            {nextTrip.flightRequired&&<div className={flightReady?'ok':'pending'}><PlaneIcon/> {flightReady?'Passagem solicitada/confirmada':'Passagem ainda não solicitada'}</div>}
           </div>
           <button className="text-link text-link-button" onClick={()=>navigate(`/viagens?trip=${encodeURIComponent(nextTrip.id)}`)}>Ver viagem <ArrowIcon/></button>
         </> : <div className="empty-inline"><p>Quando você criar uma viagem, hotel, veículo e atendimentos aparecerão aqui.</p><a className="text-link" href="/viagens">Abrir viagens <ArrowIcon/></a></div>}

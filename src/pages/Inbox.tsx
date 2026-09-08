@@ -6,7 +6,7 @@ import { useRoutine } from '../context/RoutineContext'
 import { tripDisplayTitle } from '../lib/tripTitle'
 import { formatCompanyName, formatEquipmentSummary } from '../lib/format'
 import { companyClass, companyKey, type CompanyFilter as CompanyFilterValue } from '../lib/company'
-import { isHotelReady, isVehicleReady } from '../lib/tripReadiness'
+import { isFlightReady, isHotelReady, isVehicleReady } from '../lib/tripReadiness'
 import type { Demand, DemandStatus, Trip } from '../types/routine'
 
 type StatusFilter = 'all' | DemandStatus
@@ -34,12 +34,12 @@ function buildStage(d: Demand, appointments: ReturnType<typeof useRoutine>['appo
   const linkedTrip = appointment ? trips.find(t => t.appointments.some(a => a.id === appointment.id)) : undefined
   const activeTrip = linkedTrip?.status === 'planned' ? linkedTrip : undefined
   const completedTrip = linkedTrip?.status === 'completed' ? linkedTrip : undefined
-  const logisticsReady = activeTrip ? isHotelReady(activeTrip) && isVehicleReady(activeTrip) : false
+  const logisticsReady = activeTrip ? isHotelReady(activeTrip) && isVehicleReady(activeTrip) && isFlightReady(activeTrip) : false
 
   if (d.status === 'cancelled') return { label: 'Cancelada', cls: 'cancelled', next: 'Sem próximo passo', kind: 'completed', trip: linkedTrip, date: linkedTrip?.end }
   if (d.status === 'done' || completedTrip) return { label: 'Concluída', cls: 'completed', next: 'No histórico', kind: 'completed', trip: completedTrip, date: completedTrip?.end || appointment?.end }
   if (activeTrip && logisticsReady) return { label: 'Viagem pronta', cls: 'ready', next: 'Acompanhar viagem', kind: 'ready', trip: activeTrip, date: activeTrip.start }
-  if (activeTrip) return { label: 'Logística pendente', cls: 'scheduled', next: 'Organizar hotel e veículo', kind: 'open', trip: activeTrip, date: activeTrip.start }
+  if (activeTrip) return { label: 'Logística pendente', cls: 'scheduled', next: 'Organizar logística da viagem', kind: 'open', trip: activeTrip, date: activeTrip.start }
   if (appointment?.type === 'Remoto') return { label: 'Remoto agendado', cls: 'scheduled', next: 'Acompanhar atendimento remoto', kind: 'open', date: appointment.start }
   if (appointment) return { label: 'Agendada', cls: 'scheduled', next: 'Organizar viagem', kind: 'open', date: appointment.start }
   if (d.city && d.state) return { label: 'Pronta para agendar', cls: 'contact', next: 'Combinar data com o cliente', kind: 'open' }

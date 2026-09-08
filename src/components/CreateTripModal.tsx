@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarIcon, CheckIcon, LocationIcon, RouteIcon } from './Icons'
+import { CalendarIcon, CheckIcon, LocationIcon, PlaneIcon, RouteIcon } from './Icons'
 import { useRoutine } from '../context/RoutineContext'
 import { LocationFields } from './LocationFields'
 import { locationLabel, parseLocationLabel } from '../lib/location'
@@ -20,6 +20,7 @@ export function CreateTripModal({ open, onClose }: { open: boolean; onClose: () 
   const [end,setEnd] = useState('')
   const [hotelRequired,setHotelRequired] = useState(true)
   const [vehicleRequired,setVehicleRequired] = useState(true)
+  const [flightRequired,setFlightRequired] = useState(false)
   const [selected,setSelected] = useState<string[]>([])
   const [busy,setBusy] = useState(false)
   const [error,setError] = useState<string|null>(null)
@@ -31,7 +32,7 @@ export function CreateTripModal({ open, onClose }: { open: boolean; onClose: () 
       if(draft){
         const dep=parseLocationLabel(draft.origin||'')
         setTitle(draft.title||''); setTitleTouched(Boolean(draft.titleTouched)); setDepartureCity(dep.city||last.city); setDepartureState(dep.state||last.state)
-        setStart(draft.start||''); setEnd(draft.end||''); setHotelRequired(draft.hotelRequired??true); setVehicleRequired(draft.vehicleRequired??true); setSelected(draft.selected||[])
+        setStart(draft.start||''); setEnd(draft.end||''); setHotelRequired(draft.hotelRequired??true); setVehicleRequired(draft.vehicleRequired??true); setFlightRequired(draft.flightRequired??false); setSelected(draft.selected||[])
       } else { setDepartureCity(last.city); setDepartureState(last.state) }
     } catch { /* noop */ }
   },[])
@@ -45,7 +46,7 @@ export function CreateTripModal({ open, onClose }: { open: boolean; onClose: () 
     if(chosen.length && !titleTouched) setTitle(suggestedTripTitle(chosen))
   },[chosen,titleTouched])
 
-  useEffect(()=>{ try{localStorage.setItem(DRAFT_KEY,JSON.stringify({title,titleTouched,origin:locationLabel(departureCity,departureState),start,end,hotelRequired,vehicleRequired,selected}))}catch{} },[title,titleTouched,departureCity,departureState,start,end,hotelRequired,vehicleRequired,selected])
+  useEffect(()=>{ try{localStorage.setItem(DRAFT_KEY,JSON.stringify({title,titleTouched,origin:locationLabel(departureCity,departureState),start,end,hotelRequired,vehicleRequired,flightRequired,selected}))}catch{} },[title,titleTouched,departureCity,departureState,start,end,hotelRequired,vehicleRequired,flightRequired,selected])
 
   if(!open) return null
 
@@ -66,10 +67,10 @@ export function CreateTripModal({ open, onClose }: { open: boolean; onClose: () 
     setBusy(true);setError(null)
     try{
       const origin=locationLabel(departureCity,departureState)
-      await createTrip({title:title.trim(),origin,start,end,hotelRequired,vehicleRequired,appointmentIds:selected})
+      await createTrip({title:title.trim(),origin,start,end,hotelRequired,vehicleRequired,flightRequired,appointmentIds:selected})
       localStorage.setItem(LAST_DEPARTURE_KEY,origin)
       localStorage.removeItem(DRAFT_KEY)
-      setTitle('');setTitleTouched(false);setStart('');setEnd('');setHotelRequired(true);setVehicleRequired(true);setSelected([])
+      setTitle('');setTitleTouched(false);setStart('');setEnd('');setHotelRequired(true);setVehicleRequired(true);setFlightRequired(false);setSelected([])
       onClose()
     }catch(e:any){setError(e?.message||'Não foi possível criar a viagem.')}
     finally{setBusy(false)}
@@ -90,7 +91,7 @@ export function CreateTripModal({ open, onClose }: { open: boolean; onClose: () 
 
       <div className="trip-planning-block">
         <div className="modal-subhead"><div><span className="eyebrow">2. Deslocamento</span><h3>Defina o ponto de partida e o período</h3></div></div>
-        <div className="departure-location-box"><div className="departure-location-title"><LocationIcon/><div><strong>Ponto de partida</strong><small>É de onde você inicia e para onde a estimativa de rota considera o retorno.</small></div></div><div className="form-grid departure-location-grid"><LocationFields city={departureCity} state={departureState} onCityChange={setDepartureCity} onStateChange={setDepartureState} required/></div></div>
+        <div className="departure-location-box"><div className="departure-location-title"><LocationIcon/><div><strong>Ponto de partida</strong><small>É de onde você inicia e onde começa a rota terrestre até a última parada.</small></div></div><div className="form-grid departure-location-grid"><LocationFields city={departureCity} state={departureState} onCityChange={setDepartureCity} onStateChange={setDepartureState} required/></div></div>
         <div className="form-grid trip-form-grid">
           <label className="field field-wide"><span>Nome da viagem *</span><input value={title} onChange={e=>{setTitle(e.target.value);setTitleTouched(true)}} placeholder={chosen.length?suggestedTripTitle(chosen):'Ex.: Goiás • Setembro'}/><small className="field-inline-hint">O Routine sugere o nome conforme os destinos. Você pode personalizar.</small></label>
           <label className="field"><span>Saída *</span><input type="date" value={start} onChange={e=>setStart(e.target.value)}/></label>
@@ -101,6 +102,7 @@ export function CreateTripModal({ open, onClose }: { open: boolean; onClose: () 
       <div className="travel-options">
         <label className="confirm-row"><input type="checkbox" checked={hotelRequired} onChange={e=>setHotelRequired(e.target.checked)}/><span><strong>Precisa de hotel</strong><small>O Routine vai alertar antes da viagem enquanto não houver reserva confirmada.</small></span></label>
         <label className="confirm-row"><input type="checkbox" checked={vehicleRequired} onChange={e=>setVehicleRequired(e.target.checked)}/><span><strong>Precisa de veículo</strong><small>O Routine vai acompanhar o envio do Forms e a confirmação da locadora.</small></span></label>
+        <label className="confirm-row"><input type="checkbox" checked={flightRequired} onChange={e=>setFlightRequired(e.target.checked)}/><span><strong><PlaneIcon/> Precisa de passagem aérea</strong><small>O Routine vai montar o e-mail para o Outlook e acompanhar a confirmação do voo.</small></span></label>
       </div>
       <div className="draft-note">A viagem também fica salva como rascunho se você sair desta tela.</div>
       {error&&<div className="auth-message error modal-error">{error}</div>}

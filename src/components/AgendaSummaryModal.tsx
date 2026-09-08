@@ -1,10 +1,10 @@
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { CalendarIcon, CarIcon, CheckIcon, HotelIcon, LocationIcon, RouteIcon } from './Icons'
+import { CalendarIcon, CarIcon, CheckIcon, HotelIcon, LocationIcon, PlaneIcon, RouteIcon } from './Icons'
 import { formatDateRange } from '../lib/format'
-import { isHotelReady, isVehicleReady } from '../lib/tripReadiness'
+import { isFlightReady, isHotelReady, isVehicleReady } from '../lib/tripReadiness'
 import { appointmentCompanyKey, companyClass, companyLabel, tripCompanyKey } from '../lib/company'
-import { holidayForDate } from '../lib/calendar'
+import { compactTripCommercials, holidayForDate } from '../lib/calendar'
 import { tripDisplayTitle } from '../lib/tripTitle'
 import type { Appointment, Demand, Holiday, Trip } from '../types/routine'
 
@@ -45,6 +45,8 @@ export function AgendaSummaryModal({
         {dayTrips.map(trip => {
           const hotelReady = isHotelReady(trip)
           const vehicleReady = isVehicleReady(trip)
+          const flightReady = isFlightReady(trip)
+          const commercial = compactTripCommercials(trip,demands,3)
           const todayStops = trip.appointments.filter(a => a.start <= dateKey && a.end >= dateKey)
           const key=tripCompanyKey(trip,demands)
           return <article className={`agenda-summary-item trip agenda-trip-summary ${companyClass(key)}`} key={trip.id}>
@@ -52,11 +54,12 @@ export function AgendaSummaryModal({
             <div className="grow">
               <div className="summary-title-line"><span className="company-badge">{companyLabel(key)}</span><span className="eyebrow">Viagem</span></div>
               <h3>{tripDisplayTitle(trip)}</h3>
-              <p>{formatDateRange(trip.start, trip.end)}{trip.origin ? ` • Partida: ${trip.origin}` : ''}</p>
+              <p>{formatDateRange(trip.start, trip.end)}{trip.origin ? ` • Partida: ${trip.origin}` : ''}</p>{commercial&&<p className="summary-commercial">Responsável comercial: <strong>{commercial}</strong></p>}
               <div className="summary-chips">
                 <span><CheckIcon/> {trip.appointments.length} {trip.appointments.length === 1 ? 'atendimento' : 'atendimentos'}</span>
                 <span className={hotelReady ? 'ok' : 'pending'}><HotelIcon/> {trip.hotelRequired ? (hotelReady ? 'Hotel organizado' : 'Hotel pendente') : 'Sem hotel'}</span>
                 <span className={vehicleReady ? 'ok' : 'pending'}><CarIcon/> {trip.vehicleRequired ? (vehicleReady ? 'Veículo organizado' : 'Veículo pendente') : 'Sem veículo'}</span>
+                {trip.flightRequired&&<span className={flightReady ? 'ok' : 'pending'}><PlaneIcon/> {flightReady ? 'Passagem organizada' : 'Passagem pendente'}</span>}
               </div>
               {todayStops.length > 0 && <div className="agenda-trip-stops">
                 <span className="eyebrow">Fazendas nesta data</span>

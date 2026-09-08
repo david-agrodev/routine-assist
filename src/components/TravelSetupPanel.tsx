@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CarIcon, CheckIcon, HotelIcon, LocationIcon, RouteIcon } from './Icons'
+import { CarIcon, CheckIcon, HotelIcon, LocationIcon, PlaneIcon, RouteIcon } from './Icons'
 import { useRoutine } from '../context/RoutineContext'
 import { formatDateRange } from '../lib/format'
 import { LocationFields } from './LocationFields'
@@ -25,6 +25,7 @@ export function TravelSetupPanel({ appointment, onFinish }: { appointment: Appoi
   const [end, setEnd] = useState(appointment.end)
   const [hotelRequired, setHotelRequired] = useState(true)
   const [vehicleRequired, setVehicleRequired] = useState(true)
+  const [flightRequired, setFlightRequired] = useState(false)
   const [tripId, setTripId] = useState(linkedTrip?.id || '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -43,6 +44,7 @@ export function TravelSetupPanel({ appointment, onFinish }: { appointment: Appoi
       setEnd(draft.end || appointment.end)
       setHotelRequired(draft.hotelRequired ?? true)
       setVehicleRequired(draft.vehicleRequired ?? true)
+      setFlightRequired(draft.flightRequired ?? false)
       setTripId(draft.tripId || '')
     } catch { /* rascunho opcional */ }
   }, [appointment.id, appointment.city, appointment.client, appointment.start, appointment.end, linkedTrip])
@@ -51,8 +53,8 @@ export function TravelSetupPanel({ appointment, onFinish }: { appointment: Appoi
 
   useEffect(() => {
     if (linkedTrip || mode === 'done') return
-    try { localStorage.setItem(draftKey(appointment.id), JSON.stringify({ mode, title, origin:locationLabel(departureCity,departureState), start, end, hotelRequired, vehicleRequired, tripId })) } catch { /* noop */ }
-  }, [appointment.id, linkedTrip, mode, title, departureCity, departureState, start, end, hotelRequired, vehicleRequired, tripId])
+    try { localStorage.setItem(draftKey(appointment.id), JSON.stringify({ mode, title, origin:locationLabel(departureCity,departureState), start, end, hotelRequired, vehicleRequired, flightRequired, tripId })) } catch { /* noop */ }
+  }, [appointment.id, linkedTrip, mode, title, departureCity, departureState, start, end, hotelRequired, vehicleRequired, flightRequired, tripId])
 
   const sortedTrips = useMemo(() => [...trips].filter(t=>t.status==='planned').sort((a,b) => a.start.localeCompare(b.start)), [trips])
   const selectedTrip = sortedTrips.find(t => t.id === tripId)
@@ -71,7 +73,7 @@ export function TravelSetupPanel({ appointment, onFinish }: { appointment: Appoi
     setBusy(true); setError(null)
     try {
       const origin=locationLabel(departureCity,departureState)
-      const id = await createTrip({ title: title.trim(), origin, start, end, hotelRequired, vehicleRequired, appointmentIds: [appointment.id] })
+      const id = await createTrip({ title: title.trim(), origin, start, end, hotelRequired, vehicleRequired, flightRequired, appointmentIds: [appointment.id] })
       localStorage.setItem(LAST_DEPARTURE_KEY,origin)
       finishWithTrip(id)
     } catch (e:any) { setError(e?.message || 'Não foi possível criar a viagem.') }
@@ -95,22 +97,22 @@ export function TravelSetupPanel({ appointment, onFinish }: { appointment: Appoi
     const trip = linkedTrip || selectedTrip
     return <div className="travel-setup success-stage">
       <div className="travel-success-head"><span className="section-icon neutral"><CheckIcon/></span><div><strong>{trip ? 'Viagem organizada' : 'Atendimento vinculado'}</strong><p>{trip ? `${tripDisplayTitle(trip)} • ${formatDateRange(trip.start, trip.end)}` : 'O atendimento já faz parte de uma viagem.'}</p></div></div>
-      <div className="next-logistics-grid"><div><HotelIcon/><span><strong>Hospedagem</strong><small>{trip?.hotelRequired === false ? 'Não necessária' : 'Cadastrar ou confirmar hotel'}</small></span></div><div><CarIcon/><span><strong>Veículo</strong><small>{trip?.vehicleRequired === false ? 'Não necessário' : 'Solicitar pelo Forms e acompanhar'}</small></span></div></div>
-      <div className="modal-actions travel-actions"><button className="ghost" onClick={onFinish}>Fechar por enquanto</button><button className="primary" onClick={goTrips}><RouteIcon/> Continuar para hotel e veículo</button></div>
+      <div className="next-logistics-grid"><div><HotelIcon/><span><strong>Hospedagem</strong><small>{trip?.hotelRequired === false ? 'Não necessária' : 'Cadastrar ou confirmar hotel'}</small></span></div><div><CarIcon/><span><strong>Veículo</strong><small>{trip?.vehicleRequired === false ? 'Não necessário' : 'Solicitar pelo Forms e acompanhar'}</small></span></div><div><PlaneIcon/><span><strong>Passagem</strong><small>{trip?.flightRequired === false ? 'Não necessária' : 'Solicitar pelo Outlook e acompanhar'}</small></span></div></div>
+      <div className="modal-actions travel-actions"><button className="ghost" onClick={onFinish}>Fechar por enquanto</button><button className="primary" onClick={goTrips}><RouteIcon/> Continuar para logística da viagem</button></div>
     </div>
   }
 
   if (mode === 'create') return <div className="travel-setup">
     <div className="travel-stage-head"><button className="text-back" onClick={()=>setMode('choose')}>← Voltar</button><div><span className="eyebrow">Etapa 2 de 2</span><h3>Criar viagem</h3><p>O destino já vem do atendimento. Aqui você define apenas partida e período da logística.</p></div></div>
     <div className="detected-destinations"><span className="section-icon neutral"><LocationIcon/></span><div><strong>Destino detectado</strong><div className="destination-chips"><span>{appointment.city}/{appointment.state} • {appointment.farmName || appointment.client}</span></div></div></div>
-    <div className="departure-location-box"><div className="departure-location-title"><LocationIcon/><div><strong>Ponto de partida *</strong><small>Selecione de onde você inicia e para onde a estimativa de rota considera o retorno.</small></div></div><div className="form-grid departure-location-grid"><LocationFields city={departureCity} state={departureState} onCityChange={setDepartureCity} onStateChange={setDepartureState} required/></div></div>
+    <div className="departure-location-box"><div className="departure-location-title"><LocationIcon/><div><strong>Ponto de partida *</strong><small>Selecione de onde você inicia e onde começa a rota terrestre até a última parada.</small></div></div><div className="form-grid departure-location-grid"><LocationFields city={departureCity} state={departureState} onCityChange={setDepartureCity} onStateChange={setDepartureState} required/></div></div>
     <div className="form-grid trip-form-grid">
       <label className="field field-wide"><span>Nome da viagem *</span><input value={title} onChange={e=>setTitle(e.target.value)} placeholder={suggestedTripTitle([appointment])}/></label>
       <label className="field"><span>Saída *</span><input type="date" value={start} onChange={e=>setStart(e.target.value)}/></label>
       <label className="field"><span>Retorno *</span><input type="date" value={end} onChange={e=>setEnd(e.target.value)}/></label>
     </div>
     <p className="field-help">As datas começaram iguais ao atendimento. Ajuste saída e retorno conforme sua logística.</p>
-    <div className="travel-options compact-options"><label className="confirm-row"><input type="checkbox" checked={hotelRequired} onChange={e=>setHotelRequired(e.target.checked)}/><span><strong>Precisa de hotel</strong><small>Gera alertas até a hospedagem estar organizada.</small></span></label><label className="confirm-row"><input type="checkbox" checked={vehicleRequired} onChange={e=>setVehicleRequired(e.target.checked)}/><span><strong>Precisa de veículo</strong><small>Gera alerta para solicitar e confirmar a reserva.</small></span></label></div>
+    <div className="travel-options compact-options"><label className="confirm-row"><input type="checkbox" checked={hotelRequired} onChange={e=>setHotelRequired(e.target.checked)}/><span><strong>Precisa de hotel</strong><small>Gera alertas até a hospedagem estar organizada.</small></span></label><label className="confirm-row"><input type="checkbox" checked={vehicleRequired} onChange={e=>setVehicleRequired(e.target.checked)}/><span><strong>Precisa de veículo</strong><small>Gera alerta para solicitar e confirmar a reserva.</small></span></label><label className="confirm-row"><input type="checkbox" checked={flightRequired} onChange={e=>setFlightRequired(e.target.checked)}/><span><strong><PlaneIcon/> Precisa de passagem aérea</strong><small>Gera alerta até a solicitação ser enviada pelo Outlook.</small></span></label></div>
     {error && <div className="auth-message error modal-error">{error}</div>}
     <div className="modal-actions"><button className="ghost" onClick={()=>setMode('choose')}>Voltar</button><button className="primary" disabled={!title.trim()||!departureCity||!departureState||!start||!end||busy} onClick={()=>void handleCreate()}><RouteIcon/> {busy?'Criando...':'Criar e vincular'}</button></div>
   </div>

@@ -73,6 +73,35 @@ export type VehicleReservation = {
   notes?: string
 }
 
+export type FlightStatus = 'not_requested' | 'requested' | 'confirmed'
+
+export type FlightReservation = {
+  id: string
+  status: FlightStatus
+  outboundOrigin?: string
+  outboundDestination?: string
+  outboundDate?: string
+  outboundTime?: string
+  returnOrigin?: string
+  returnDestination?: string
+  returnDate?: string
+  returnTime?: string
+  airline?: string
+  locator?: string
+  outboundFlightNumber?: string
+  returnFlightNumber?: string
+  requestedAt?: string
+  notes?: string
+}
+
+export type UserProfile = {
+  id: string
+  fullName?: string
+  cpf?: string
+  phone?: string
+  birthDate?: string
+}
+
 export type TripStatus = 'planned' | 'completed'
 
 export type Trip = {
@@ -86,6 +115,8 @@ export type Trip = {
   lodgings: Lodging[]
   vehicleRequired: boolean
   vehicles: VehicleReservation[]
+  flightRequired: boolean
+  flights: FlightReservation[]
   status: TripStatus
   completedAt?: string
   routeDistanceKm?: number
@@ -165,6 +196,7 @@ export type CreateTripInput = {
   end: string
   hotelRequired: boolean
   vehicleRequired: boolean
+  flightRequired: boolean
   appointmentIds: string[]
 }
 
@@ -199,6 +231,25 @@ export type SaveVehicleInput = {
   notes?: string
 }
 
+export type SaveFlightInput = {
+  tripId: string
+  reservationId?: string
+  status: FlightStatus
+  outboundOrigin?: string
+  outboundDestination?: string
+  outboundDate?: string
+  outboundTime?: string
+  returnOrigin?: string
+  returnDestination?: string
+  returnDate?: string
+  returnTime?: string
+  airline?: string
+  locator?: string
+  outboundFlightNumber?: string
+  returnFlightNumber?: string
+  notes?: string
+}
+
 export type UpdateAppointmentInput = {
   appointmentId: string
   demandId?: string
@@ -219,10 +270,18 @@ export type UpdateTripInput = {
   end: string
   hotelRequired: boolean
   vehicleRequired: boolean
+  flightRequired: boolean
 }
 
 export type SaveTripRouteInput = {
   tripId: string
   distanceKm: number
   durationMinutes: number
+}
+
+export type UpdateUserProfileInput = {
+  fullName: string
+  cpf?: string
+  phone?: string
+  birthDate?: string
 }

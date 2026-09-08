@@ -9,10 +9,13 @@ import type {
   CreateTripInput,
   Demand,
   SaveVehicleInput,
+  SaveFlightInput,
   Trip,
   Hotel,
   NotificationPreferences,
   SaveTripRouteInput,
+  UserProfile,
+  UpdateUserProfileInput,
 } from '../types/routine'
 
 function requireClient() {
@@ -151,7 +154,7 @@ export async function getTrips(workspaceId: string): Promise<Trip[]> {
   const { data, error } = await client
     .from('trips')
     .select(`
-      id,title,origin,starts_at,ends_at,hotel_required,vehicle_required,status,completed_at,route_distance_km,route_duration_minutes,route_calculated_at,
+      id,title,origin,starts_at,ends_at,hotel_required,vehicle_required,flight_required,status,completed_at,route_distance_km,route_duration_minutes,route_calculated_at,
       trip_appointments(
         sort_order,
         appointments(id,demand_id,responsible_user_id,title,farm_name_snapshot,city_snapshot,state_snapshot,starts_at,ends_at,appointment_type,client_confirmed)
@@ -160,7 +163,8 @@ export async function getTrips(workspaceId: string): Promise<Trip[]> {
         id,hotel_id,check_in,check_out,price_mode,daily_value,total_value,reservation_code,confirmed,notes,
         hotels(name,address,city,state,phone)
       ),
-      vehicle_reservations(id,status,rental_company,locator,requested_at,pickup_at,return_at,pickup_location,notes)
+      vehicle_reservations(id,status,rental_company,locator,requested_at,pickup_at,return_at,pickup_location,notes),
+      flight_reservations(id,status,outbound_origin,outbound_destination,outbound_date,outbound_time,return_origin,return_destination,return_date,return_time,airline,locator,outbound_flight_number,return_flight_number,requested_at,notes)
     `)
     .eq('workspace_id', workspaceId)
     .order('starts_at', { ascending: true })
@@ -216,6 +220,25 @@ export async function getTrips(workspaceId: string): Promise<Trip[]> {
       notes: v.notes || undefined,
     }))
 
+    const flights = (row.flight_reservations ?? []).map((f: any) => ({
+      id: f.id,
+      status: f.status,
+      outboundOrigin: f.outbound_origin || undefined,
+      outboundDestination: f.outbound_destination || undefined,
+      outboundDate: f.outbound_date || undefined,
+      outboundTime: f.outbound_time ? String(f.outbound_time).slice(0,5) : undefined,
+      returnOrigin: f.return_origin || undefined,
+      returnDestination: f.return_destination || undefined,
+      returnDate: f.return_date || undefined,
+      returnTime: f.return_time ? String(f.return_time).slice(0,5) : undefined,
+      airline: f.airline || undefined,
+      locator: f.locator || undefined,
+      outboundFlightNumber: f.outbound_flight_number || undefined,
+      returnFlightNumber: f.return_flight_number || undefined,
+      requestedAt: f.requested_at || undefined,
+      notes: f.notes || undefined,
+    }))
+
     return {
       id: row.id,
       title: row.title,
@@ -227,6 +250,8 @@ export async function getTrips(workspaceId: string): Promise<Trip[]> {
       lodgings,
       vehicleRequired: Boolean(row.vehicle_required),
       vehicles,
+      flightRequired: Boolean(row.flight_required),
+      flights,
       status: row.status || 'planned',
       completedAt: row.completed_at || undefined,
       routeDistanceKm: row.route_distance_km == null ? undefined : Number(row.route_distance_km),
@@ -390,6 +415,7 @@ export async function createTrip(
       ends_at: input.end,
       hotel_required: input.hotelRequired,
       vehicle_required: input.vehicleRequired,
+      flight_required: input.flightRequired,
       route_distance_km: null,
       route_duration_minutes: null,
       route_calculated_at: null,
@@ -415,7 +441,7 @@ export async function createTrip(
     const demandIds = [...new Set((linkedAppointments ?? []).map((a: any) => a.demand_id).filter(Boolean))]
     if (demandIds.length) {
       const { error: demandError } = await client.from('demands')
-        .update({ next_step: 'Organizar hotel e veículo' })
+        .update({ next_step: 'Organizar logística da viagem' })
         .eq('workspace_id', workspaceId)
         .in('id', demandIds)
       if (demandError) throw demandError
@@ -477,7 +503,7 @@ export async function linkAppointmentsToTrip(
   const demandIds = [...new Set((linkedAppointments ?? []).map((a: any) => a.demand_id).filter(Boolean))]
   if (demandIds.length) {
     const { error: demandError } = await client.from('demands')
-      .update({ next_step: 'Organizar hotel e veículo' })
+      .update({ next_step: 'Organizar logística da viagem' })
       .eq('workspace_id', workspaceId)
       .in('id', demandIds)
     if (demandError) throw demandError
@@ -704,6 +730,7 @@ export async function updateTrip(
       ends_at: input.end,
       hotel_required: input.hotelRequired,
       vehicle_required: input.vehicleRequired,
+      flight_required: input.flightRequired,
       route_distance_km: null,
       route_duration_minutes: null,
       route_calculated_at: null,
@@ -711,6 +738,59 @@ export async function updateTrip(
     .eq('workspace_id', workspaceId)
     .eq('id', input.tripId)
   if (error) throw error
+}
+
+
+
+export async function getUserProfile(userId: string): Promise<UserProfile> {
+  const client = requireClient()
+  const { data, error } = await client.from('profiles').select('id,full_name,cpf,phone,birth_date').eq('id', userId).single()
+  if (error) throw error
+  return { id:data.id, fullName:data.full_name || undefined, cpf:data.cpf || undefined, phone:data.phone || undefined, birthDate:data.birth_date || undefined }
+}
+
+export async function updateUserProfile(userId: string, input: UpdateUserProfileInput): Promise<UserProfile> {
+  const client = requireClient()
+  const { data, error } = await client.from('profiles').update({
+    full_name: input.fullName.trim(),
+    cpf: input.cpf?.trim() || null,
+    phone: input.phone?.trim() || null,
+    birth_date: input.birthDate || null,
+    updated_at: new Date().toISOString(),
+  }).eq('id', userId).select('id,full_name,cpf,phone,birth_date').single()
+  if (error) throw error
+  return { id:data.id, fullName:data.full_name || undefined, cpf:data.cpf || undefined, phone:data.phone || undefined, birthDate:data.birth_date || undefined }
+}
+
+export async function saveFlightReservation(workspaceId: string, input: SaveFlightInput): Promise<void> {
+  const client = requireClient()
+  const payload = {
+    workspace_id: workspaceId,
+    trip_id: input.tripId,
+    status: input.status,
+    outbound_origin: input.outboundOrigin?.trim() || null,
+    outbound_destination: input.outboundDestination?.trim() || null,
+    outbound_date: input.outboundDate || null,
+    outbound_time: input.outboundTime || null,
+    return_origin: input.returnOrigin?.trim() || null,
+    return_destination: input.returnDestination?.trim() || null,
+    return_date: input.returnDate || null,
+    return_time: input.returnTime || null,
+    airline: input.airline?.trim() || null,
+    locator: input.locator?.trim() || null,
+    outbound_flight_number: input.outboundFlightNumber?.trim() || null,
+    return_flight_number: input.returnFlightNumber?.trim() || null,
+    requested_at: input.status === 'not_requested' ? null : new Date().toISOString(),
+    notes: input.notes?.trim() || null,
+    updated_at: new Date().toISOString(),
+  }
+  if (input.reservationId) {
+    const { error } = await client.from('flight_reservations').update(payload).eq('workspace_id', workspaceId).eq('id', input.reservationId)
+    if (error) throw error
+  } else {
+    const { error } = await client.from('flight_reservations').upsert(payload, { onConflict:'trip_id' })
+    if (error) throw error
+  }
 }
 
 export async function saveTripRoute(workspaceId:string,input:SaveTripRouteInput):Promise<void>{

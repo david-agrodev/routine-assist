@@ -1,15 +1,28 @@
-# Supabase — Routine Assist v1.7
+# Supabase — Routine Assist v1.9
 
-Para uma base que já está na v1.5, execute somente:
+## Projeto existente
 
-`supabase/migration-v1.7.sql`
+Se você já está usando o Routine Assist v1.8, execute somente:
 
-A migration:
+`supabase/migration-v1.9.sql`
 
-- adiciona `route_distance_km` em `trips`;
-- adiciona `route_duration_minutes` em `trips`;
-- adiciona `route_calculated_at` em `trips`;
-- ajusta a regra de conflito para não tratar atendimentos da mesma viagem como conflito durante edição;
-- mantém bloqueios entre viagens diferentes.
+No painel do Supabase:
 
-Nenhuma demanda, viagem, hotel ou veículo é apagado.
+1. SQL Editor
+2. New query
+3. Cole todo o conteúdo de `migration-v1.9.sql`
+4. Run
+
+A migration não apaga demandas, viagens, hotéis ou veículos existentes.
+
+Ela adiciona:
+- `profiles.cpf`
+- `profiles.phone`
+- `profiles.birth_date`
+- `trips.flight_required`
+- tabela `flight_reservations`
+- RLS e índices para a nova tabela
+
+## Projeto novo
+
+Para uma instalação do zero, use `supabase/setup.sql`, que já contém a estrutura da v1.9.

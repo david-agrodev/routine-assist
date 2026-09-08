@@ -32,3 +32,6 @@ export const ArchiveIcon = (p:P) => <svg {...base} {...p}><path d="M5 7h14v12H5z
 
 export const EyeIcon = (p:P) => <svg {...base} {...p}><path d="M2.8 12s3.4-5.5 9.2-5.5 9.2 5.5 9.2 5.5-3.4 5.5-9.2 5.5S2.8 12 2.8 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
 export const EyeOffIcon = (p:P) => <svg {...base} {...p}><path d="m4 4 16 16"/><path d="M9.2 6.9A9.8 9.8 0 0 1 12 6.5c5.8 0 9.2 5.5 9.2 5.5a15.5 15.5 0 0 1-3 3.5M14.7 14.7a3.7 3.7 0 0 1-5.4-5.4M6.1 8.1A16 16 0 0 0 2.8 12s3.4 5.5 9.2 5.5a9.7 9.7 0 0 0 3-.5"/></svg>
+export const PlaneIcon = (p:P) => <svg {...base} {...p}><path d="M3.5 13.5 20 6.2c1.1-.5 2 .8 1.1 1.6l-5 4.2-1 5.6-2.1 1-.8-4.6-4.5 2.5-1 2.8-1.5.7-.1-3.2-2.6-1.8 1-.5 3 .4 4.6-2.7-3.6-2.4.4-1.5 5.1 1.5Z"/></svg>
+export const MailIcon = (p:P) => <svg {...base} {...p}><rect x="3.5" y="5.5" width="17" height="13" rx="2.2"/><path d="m5 8 7 5 7-5"/></svg>
+export const UserIcon = (p:P) => <svg {...base} {...p}><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg>

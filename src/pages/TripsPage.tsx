@@ -10,6 +10,8 @@ import {
   HotelIcon,
   ListIcon,
   LocationIcon,
+  MailIcon,
+  PlaneIcon,
   PlusIcon,
   RouteIcon,
   TrashIcon,
@@ -18,6 +20,7 @@ import { CreateTripModal } from '../components/CreateTripModal'
 import { LinkAppointmentsModal } from '../components/LinkAppointmentsModal'
 import { LodgingModal } from '../components/LodgingModal'
 import { VehicleModal } from '../components/VehicleModal'
+import { FlightModal } from '../components/FlightModal'
 import { ConfirmActionModal } from '../components/ConfirmActionModal'
 import { EditTripModal } from '../components/EditTripModal'
 import { DemandDetailModal } from '../components/DemandDetailModal'
@@ -26,7 +29,7 @@ import { VEHICLE_FORM_URL } from '../lib/constants'
 import { formatDateRange, formatMoney } from '../lib/format'
 import { companyClass, companyLabel, tripCompanyKey } from '../lib/company'
 import { compactTripStops } from '../lib/calendar'
-import { isHotelReady, isVehicleReady } from '../lib/tripReadiness'
+import { isFlightReady, isHotelReady, isVehicleReady } from '../lib/tripReadiness'
 import { tripDisplayTitle } from '../lib/tripTitle'
 import { calculateRouteEstimate } from '../services/routes'
 import type { Lodging, Trip } from '../types/routine'
@@ -41,6 +44,7 @@ export function TripsPage(){
   const [lodgingTrip,setLodgingTrip]=useState<Trip|null>(null)
   const [editingLodging,setEditingLodging]=useState<Lodging|null>(null)
   const [vehicleTrip,setVehicleTrip]=useState<Trip|null>(null)
+  const [flightTrip,setFlightTrip]=useState<Trip|null>(null)
   const [linkTrip,setLinkTrip]=useState<Trip|null>(null)
   const [editTrip,setEditTrip]=useState<Trip|null>(null)
   const [deleting,setDeleting]=useState(false)
@@ -71,8 +75,10 @@ export function TripsPage(){
     if (!focusTrip) return
     setSelectedId(focusTrip.id)
     setTripTab(focusTrip.status==='completed'?'history':focusTrip.start<=todayIso?'ongoing':'upcoming')
-    setSearchParams({trip:focusTrip.id})
-    try { window.localStorage.removeItem('routine-assist-focus-trip') } catch { /* noop */ }
+    let storedFocus=''
+    try { storedFocus=window.localStorage.getItem('routine-assist-focus-section')||'' } catch { /* noop */ }
+    setSearchParams(storedFocus?{trip:focusTrip.id,focus:storedFocus}:{trip:focusTrip.id})
+    try { window.localStorage.removeItem('routine-assist-focus-trip'); window.localStorage.removeItem('routine-assist-focus-section') } catch { /* noop */ }
   },[queryTripId,sorted,setSearchParams,todayIso])
 
   useEffect(()=>{
@@ -96,7 +102,7 @@ export function TripsPage(){
 
   useEffect(()=>{
     if (!selectedId || !focusSection) return
-    const id = focusSection === 'hotel' ? 'trip-hotel-card' : focusSection === 'vehicle' ? 'trip-vehicle-card' : 'trip-selected-detail'
+    const id = focusSection === 'hotel' ? 'trip-hotel-card' : focusSection === 'vehicle' ? 'trip-vehicle-card' : focusSection === 'flight' ? 'trip-flight-card' : 'trip-selected-detail'
     const timer = window.setTimeout(()=>document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'center'}),120)
     return ()=>window.clearTimeout(timer)
   },[selectedId,focusSection])
@@ -156,7 +162,8 @@ export function TripsPage(){
     if(!selected || routeBusy) return
     setRouteBusy(true); setRouteError(null)
     try{
-      const estimate=await calculateRouteEstimate(selected.origin || '',selected.appointments)
+      const roadOrigin=(selected.flightRequired&&flight?.outboundDestination)||selected.origin||''
+      const estimate=await calculateRouteEstimate(roadOrigin,selected.appointments)
       await saveTripRoute({tripId:selected.id,distanceKm:estimate.distanceKm,durationMinutes:estimate.durationMinutes})
     }catch(e:any){setRouteError(e?.message||'Não foi possível calcular a rota agora.')}
     finally{setRouteBusy(false)}
@@ -174,20 +181,21 @@ export function TripsPage(){
 
   const browser=<section id="trip-browser" className="panel trip-browser trip-browser-v14">
     <div className="trip-browser-head">
-      <div><span className="eyebrow">Suas viagens</span><h2>Qual viagem deseja acessar?</h2><p>Selecione um card para abrir atendimentos, hospedagem, veículo e rota.</p></div>
+      <div><span className="eyebrow">Suas viagens</span><h2>Qual viagem deseja acessar?</h2><p>Selecione um card para abrir atendimentos, hospedagem, veículo, passagem e rota.</p></div>
       <span>{tabTrips.length} nesta lista</span>
     </div>
     {tabTrips.length===0 ? <div className="trip-browser-empty"><CheckIcon/><strong>{tripTab==='history'?'Nenhuma viagem concluída ainda.':tripTab==='ongoing'?'Nenhuma viagem em andamento agora.':'Nenhuma próxima viagem programada.'}</strong><p>{tripTab==='history'?'Quando você concluir uma viagem, ela ficará guardada aqui.':'Você pode criar uma nova viagem quando precisar.'}</p></div> : <div className="trip-browser-grid">{tabTrips.map(t=>{
       const key=tripCompanyKey(t,demands)
       const hotelOk=isHotelReady(t)
       const vehicleOk=isVehicleReady(t)
+      const flightOk=isFlightReady(t)
       const overdue=t.status==='planned'&&t.end<todayIso
       return <button type="button" key={t.id} className={`trip-browser-card ${t.id===selected?.id?'active':''} ${companyClass(key)}`} onClick={()=>selectTrip(t)}>
         <span className="trip-browser-accent" aria-hidden="true"/>
         <div className="trip-browser-card-top"><span className="company-badge">{companyLabel(key)}</span><span>{formatDateRange(t.start,t.end)}</span></div><div className={`trip-lifecycle-badge ${t.status==='completed'?'completed':overdue?'overdue':t.start<=todayIso?'ongoing':'upcoming'}`}>{t.status==='completed'?'Concluída':overdue?'Aguardando conclusão':t.start<=todayIso?'Em andamento':'Programada'}</div>
         <strong>{tripDisplayTitle(t)}</strong>
         <small><LocationIcon/> {compactTripStops(t,2)}</small>
-        <div className="trip-browser-card-meta"><span><BuildingIcon/> {t.appointments.length} {t.appointments.length===1?'fazenda':'fazendas'}</span><span className={hotelOk?'ok':'pending'}><HotelIcon/>{hotelOk?'Hotel OK':'Hotel pendente'}</span><span className={vehicleOk?'ok':'pending'}><CarIcon/>{vehicleOk?'Veículo OK':'Veículo pendente'}</span></div>
+        <div className="trip-browser-card-meta"><span><BuildingIcon/> {t.appointments.length} {t.appointments.length===1?'fazenda':'fazendas'}</span><span className={hotelOk?'ok':'pending'}><HotelIcon/>{hotelOk?'Hotel OK':'Hotel pendente'}</span><span className={vehicleOk?'ok':'pending'}><CarIcon/>{vehicleOk?'Veículo OK':'Veículo pendente'}</span>{t.flightRequired&&<span className={flightOk?'ok':'pending'}><PlaneIcon/>{flightOk?'Voo OK':'Voo pendente'}</span>}</div>
         <div className="trip-browser-open"><span>Abrir viagem</span><span>→</span></div>
       </button>
     })}</div>}
@@ -206,10 +214,12 @@ export function TripsPage(){
 
   const lodging = selected.lodgings[0]
   const vehicle = selected.vehicles[0]
+  const flight = selected.flights[0]
   const hotelReady = isHotelReady(selected)
   const vehicleReady = isVehicleReady(selected)
+  const flightReady = isFlightReady(selected)
   const clientDatesReady = selected.appointments.length > 0 && selected.appointments.every(a => a.clientConfirmed !== false)
-  const readinessChecks = [selected.appointments.length>0, clientDatesReady, hotelReady, vehicleReady]
+  const readinessChecks = [selected.appointments.length>0, clientDatesReady, hotelReady, vehicleReady, ...(selected.flightRequired?[flightReady]:[])]
   const readinessDone = readinessChecks.filter(Boolean).length
   const readiness = Math.round((readinessDone/readinessChecks.length)*100)
   const companyKey=tripCompanyKey(selected,demands)
@@ -227,7 +237,7 @@ export function TripsPage(){
           <div className="trip-selected-meta"><span><RouteIcon/> Ponto de partida: {selected.origin || 'não informado'}</span><span><CalendarIconProxy/> {formatDateRange(selected.start,selected.end)}</span><span><BuildingIcon/> {selected.appointments.length} {selected.appointments.length===1?'fazenda':'fazendas'}</span></div>
         </div>
         <div className="trip-selected-actions">
-          <div className="trip-readiness-card"><span>Preparação</span><strong>{readiness}%</strong><i><b style={{width:`${readiness}%`}}/></i><small>{readinessDone}/4 etapas prontas</small></div>
+          <div className="trip-readiness-card"><span>Preparação</span><strong>{readiness}%</strong><i><b style={{width:`${readiness}%`}}/></i><small>{readinessDone}/{readinessChecks.length} etapas prontas</small></div>
           <div className="trip-action-row">{selected.status==='planned'&&<><button className="secondary mini" onClick={()=>setEditTrip(selected)}><EditIcon/> Editar</button><button className={selected.end<=todayIso?'primary mini':'secondary mini complete-trip-button'} onClick={()=>{setCompleteError(null);setCompleteOpen(true)}}><CheckIcon/> Concluir viagem</button></>}<button className="secondary mini" onClick={closeSelected}>Fechar detalhes</button><button className="danger-outline mini" disabled={deleting} onClick={()=>{setDeleteError(null);setDeleteOpen(true)}}><TrashIcon/> Excluir</button></div>
         </div>
       </header>
@@ -266,25 +276,34 @@ export function TripsPage(){
           {selected.vehicleRequired&&<div className="trip-work-card-actions split"><a className="primary compact no-margin" href={VEHICLE_FORM_URL} target="_blank" rel="noreferrer"><CarIcon/> Abrir Forms ↗</a><button className="secondary compact no-margin" onClick={()=>setVehicleTrip(selected)}>Atualizar veículo</button></div>}
         </article>
 
+        <article id="trip-flight-card" className={`trip-work-card flight-card ${flightReady?'is-ready':'needs-action'}`}>
+          <div className="trip-work-card-head"><span className={`trip-card-icon ${flightReady?'neutral':'terracotta'}`}><PlaneIcon/></span><div><span className="section-label">Passagem aérea</span><h3>{selected.flightRequired ? flight ? flight.status==='confirmed'?'Passagem confirmada':flight.status==='requested'?'Solicitação enviada':'Solicitação pendente' : 'Solicitação pendente' : 'Não necessária'}</h3></div>{flightReady&&<span className="ready-pill"><CheckIcon/> Organizado</span>}</div>
+          <div className="trip-work-card-body">
+            {selected.flightRequired ? flight ? <div className="flight-summary"><div><small>Ida</small><strong>{flight.outboundOrigin||'Origem a definir'} → {flight.outboundDestination||'Destino a definir'}</strong><span>{flight.outboundDate?flight.outboundDate.split('-').reverse().join('/'):'Data a definir'}{flight.outboundTime?` • ${flight.outboundTime}`:''}</span></div><div><small>Retorno</small><strong>{flight.returnOrigin||flight.outboundDestination||'Origem a definir'} → {flight.returnDestination||flight.outboundOrigin||'Destino a definir'}</strong><span>{flight.returnDate?flight.returnDate.split('-').reverse().join('/'):'Data a definir'}{flight.returnTime?` • ${flight.returnTime}`:''}</span></div>{flight.locator&&<div><small>Localizador</small><strong>{flight.locator}</strong><span>{flight.airline||'Companhia não informada'}</span></div>}</div> : <p className="trip-empty-copy">Informe os horários desejados e deixe o Routine montar a solicitação para o Outlook.</p> : <p className="trip-empty-copy">Esta viagem não exige passagem aérea.</p>}
+          </div>
+          {selected.flightRequired&&<div className="trip-work-card-actions"><button className={flight?'secondary compact no-margin':'primary compact no-margin'} onClick={()=>setFlightTrip(selected)}>{flight?<PlaneIcon/>:<MailIcon/>} {flight?'Atualizar passagem':'Solicitar passagem'}</button></div>}
+        </article>
+
         <article className="trip-work-card route-card route-card-v16">
           <div className="trip-work-card-head"><span className="trip-card-icon neutral"><CompassIcon/></span><div><span className="section-label">Rota da viagem</span><h3>{selected.appointments.length ? 'Ponto de partida e paradas' : 'Rota ainda vazia'}</h3></div></div>
           <div className="trip-work-card-body">
-            {selected.origin&&<div className="route-origin-row"><span className="route-origin-icon"><RouteIcon/></span><div><small>Ponto de partida</small><strong>{selected.origin}</strong></div></div>}
+            {((selected.flightRequired&&flight?.outboundDestination)||selected.origin)&&<div className="route-origin-row"><span className="route-origin-icon"><RouteIcon/></span><div><small>{selected.flightRequired&&flight?.outboundDestination?'Início da rota terrestre':'Ponto de partida'}</small><strong>{(selected.flightRequired&&flight?.outboundDestination)||selected.origin}</strong></div></div>}
             {selected.appointments.length ? <div className="route-stops-v14 route-stops-v16">{selected.appointments.map((a,index)=><div key={a.id}><i>{index+1}</i><span><strong>{a.farmName || a.client}</strong><small>{[a.city,a.state].filter(Boolean).join('/') || 'Local não informado'}{a.farmName?` • ${a.client}`:''}</small></span></div>)}</div> : <p className="trip-empty-copy">As cidades aparecem automaticamente conforme você vincula atendimentos.</p>}
             {selected.routeDistanceKm!=null&&selected.routeDurationMinutes!=null&&<div className="route-estimate-card"><div><small>Distância aproximada</small><strong>{selected.routeDistanceKm.toLocaleString('pt-BR',{maximumFractionDigits:1})} km</strong></div><div><small>Tempo estimado dirigindo</small><strong>{formatRouteDuration(selected.routeDurationMinutes)}</strong></div><p>Rota de ida: ponto de partida até a última parada, sem considerar o retorno. Estimativa entre os centros das cidades; a distância real até cada fazenda pode variar.</p></div>}
             {routeError&&<div className="auth-message error route-error">{routeError}</div>}
           </div>
-          {selected.appointments.length>0&&selected.origin&&<div className="trip-work-card-actions"><button className="secondary compact no-margin" disabled={routeBusy} onClick={()=>void calculateSelectedRoute()}><RouteIcon/> {routeBusy?'Calculando rota...':selected.routeDistanceKm!=null?'Recalcular rota':'Calcular rota aproximada'}</button></div>}
+          {selected.appointments.length>0&&((selected.flightRequired&&flight?.outboundDestination)||selected.origin)&&<div className="trip-work-card-actions"><button className="secondary compact no-margin" disabled={routeBusy} onClick={()=>void calculateSelectedRoute()}><RouteIcon/> {routeBusy?'Calculando rota...':selected.routeDistanceKm!=null?'Recalcular rota':'Calcular rota aproximada'}</button></div>}
         </article>
       </div>
 
-      <footer className="trip-status-strip"><span className={selected.appointments.length?'ok':'pending'}><CheckIcon/> {selected.appointments.length?'Atendimentos vinculados':'Atendimentos pendentes'}</span><span className={hotelReady?'ok':'pending'}><HotelIcon/> {hotelReady?'Hotel organizado':'Hotel pendente'}</span><span className={vehicleReady?'ok':'pending'}><CarIcon/> {vehicleReady?'Veículo organizado':'Veículo pendente'}</span></footer>
+      <footer className="trip-status-strip"><span className={selected.appointments.length?'ok':'pending'}><CheckIcon/> {selected.appointments.length?'Atendimentos vinculados':'Atendimentos pendentes'}</span><span className={hotelReady?'ok':'pending'}><HotelIcon/> {hotelReady?'Hotel organizado':'Hotel pendente'}</span><span className={vehicleReady?'ok':'pending'}><CarIcon/> {vehicleReady?'Veículo organizado':'Veículo pendente'}</span>{selected.flightRequired&&<span className={flightReady?'ok':'pending'}><PlaneIcon/> {flightReady?'Passagem organizada':'Passagem pendente'}</span>}</footer>
     </section>
 
     <CreateTripModal open={createOpen} onClose={()=>setCreateOpen(false)}/>
     <EditTripModal trip={editTrip} onClose={()=>setEditTrip(null)}/>
     <LodgingModal trip={lodgingTrip} lodging={editingLodging} onClose={()=>{setLodgingTrip(null);setEditingLodging(null)}}/>
     <VehicleModal trip={vehicleTrip} onClose={()=>setVehicleTrip(null)}/>
+    <FlightModal trip={flightTrip} onClose={()=>setFlightTrip(null)}/>
     <LinkAppointmentsModal trip={linkTrip} onClose={()=>setLinkTrip(null)}/>
     <DemandDetailModal demand={appointmentDemand} initialTab="schedule" onClose={()=>setAppointmentDemandId(null)}/>
     <ConfirmActionModal

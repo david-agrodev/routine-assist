@@ -1,11 +1,11 @@
 import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
 import { tripDisplayTitle } from './tripTitle'
 import type { Demand, NotificationPreferences, Trip } from '../types/routine'
-import { isHotelReady, isVehicleReady } from './tripReadiness'
+import { isFlightReady, isHotelReady, isVehicleReady } from './tripReadiness'
 
 export type PendingItem = {
   id: string
-  kind: 'hotel'|'vehicle'|'demand'|'trip'
+  kind: 'hotel'|'vehicle'|'flight'|'demand'|'trip'
   title: string
   detail: string
   urgency: 'warn'|'terracotta'|'plum'
@@ -51,29 +51,16 @@ export function buildPendingItems(
       const countdown = days < 0 ? 'viagem em andamento' : days === 0 ? 'viagem começa hoje' : `faltam ${days} dia${days === 1 ? '' : 's'}`
 
       if (trip.hotelRequired && !isHotelReady(trip)) {
-        items.push({
-          id:`hotel-${trip.id}`,
-          kind:'hotel',
-          title: days <= 1 ? 'Hotel urgente' : 'Reservar hotel',
-          detail:`${tripDisplayTitle(trip)} • ${countdown}`,
-          urgency:urgencyFor(days),
-          stage,
-          target:'/viagens',
-          entityId:trip.id,
-        })
+        items.push({ id:`hotel-${trip.id}`, kind:'hotel', title: days <= 1 ? 'Hotel urgente' : 'Reservar hotel', detail:`${tripDisplayTitle(trip)} • ${countdown}`, urgency:urgencyFor(days), stage, target:'/viagens', entityId:trip.id })
       }
 
       if (trip.vehicleRequired && !isVehicleReady(trip)) {
-        items.push({
-          id:`vehicle-${trip.id}`,
-          kind:'vehicle',
-          title: days <= 1 ? 'Veículo urgente' : 'Solicitar veículo',
-          detail:`${tripDisplayTitle(trip)} • ${countdown}`,
-          urgency:urgencyFor(days),
-          stage,
-          target:'/viagens',
-          entityId:trip.id,
-        })
+        items.push({ id:`vehicle-${trip.id}`, kind:'vehicle', title: days <= 1 ? 'Veículo urgente' : 'Solicitar veículo', detail:`${tripDisplayTitle(trip)} • ${countdown}`, urgency:urgencyFor(days), stage, target:'/viagens', entityId:trip.id })
+      }
+
+      if (trip.flightRequired && !isFlightReady(trip)) {
+        const requested=trip.flights.some(f=>f.status==='requested')
+        items.push({ id:`flight-${trip.id}`, kind:'flight', title: requested ? (days <= 1 ? 'Confirmar passagem urgente' : 'Confirmar passagem aérea') : (days <= 1 ? 'Passagem urgente' : 'Solicitar passagem aérea'), detail:`${tripDisplayTitle(trip)} • ${requested?'aguardando confirmação • ':''}${countdown}`, urgency:urgencyFor(days), stage, target:'/viagens', entityId:trip.id })
       }
     }
   }
@@ -81,15 +68,7 @@ export function buildPendingItems(
   for (const demand of demands) {
     if (demand.status === 'done' || demand.status === 'cancelled' || demand.status === 'scheduled') continue
     const missingPlace = !demand.city || !demand.state
-    if (missingPlace) items.push({
-      id:`demand-${demand.id}`,
-      kind:'demand',
-      title:'Completar demanda',
-      detail:`${demand.client} • cidade/UF ainda pendente`,
-      urgency:'plum',
-      target:'/entrada',
-      entityId:demand.id,
-    })
+    if (missingPlace) items.push({ id:`demand-${demand.id}`, kind:'demand', title:'Completar demanda', detail:`${demand.client} • cidade/UF ainda pendente`, urgency:'plum', target:'/entrada', entityId:demand.id })
   }
 
   return items.sort((a,b) => {

@@ -5,7 +5,7 @@ import { TravelSetupPanel } from './TravelSetupPanel'
 import { ConfirmActionModal } from './ConfirmActionModal'
 import { useRoutine } from '../context/RoutineContext'
 import { formatCompanyName, formatDateRange, formatEquipmentSummary } from '../lib/format'
-import { isHotelReady, isVehicleReady } from '../lib/tripReadiness'
+import { isFlightReady, isHotelReady, isVehicleReady } from '../lib/tripReadiness'
 import { tripDisplayTitle } from '../lib/tripTitle'
 import { getHolidaysInRange } from '../services/holidays'
 import type { Appointment, AppointmentConflict, Demand, DemandStatus, Holiday } from '../types/routine'
@@ -102,7 +102,8 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
   const tripComplete = Boolean(linkedTrip) || (appointment?.type === 'Remoto')
   const hotelReady = linkedTrip ? isHotelReady(linkedTrip) : false
   const vehicleReady = linkedTrip ? isVehicleReady(linkedTrip) : false
-  const logisticsReady = Boolean(linkedTrip && hotelReady && vehicleReady)
+  const flightReady = linkedTrip ? isFlightReady(linkedTrip) : false
+  const logisticsReady = Boolean(linkedTrip && hotelReady && vehicleReady && flightReady)
 
   let autoStatusText = 'Informações pendentes'
   if (demand.status === 'cancelled') autoStatusText = 'Cancelada'
@@ -115,7 +116,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
   const autoNextStep = demand.status === 'done' || linkedTrip?.status === 'completed'
     ? 'No histórico'
     : linkedTrip
-    ? logisticsReady ? 'Acompanhar a viagem' : 'Organizar hotel e veículo'
+    ? logisticsReady ? 'Acompanhar a viagem' : 'Organizar logística da viagem'
     : appointment?.type === 'Remoto' ? 'Acompanhar atendimento remoto'
     : appointment ? 'Organizar viagem'
     : infoComplete ? 'Combinar data com o cliente'
@@ -324,7 +325,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
           <div className="auto-status-panel">
             <div><span className="eyebrow">Situação automática</span><strong>{autoStatusText}</strong></div>
             <div><span className="eyebrow">Próximo passo</span><strong>{autoNextStep}</strong></div>
-            <p>O Routine atualiza o estágio conforme informações, agendamento, viagem, hotel e veículo.</p>
+            <p>O Routine atualiza o estágio conforme informações, agendamento, viagem, hotel, veículo e passagem.</p>
           </div>
 
           <div className="form-grid simplified-demand-grid">

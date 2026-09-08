@@ -559,3 +559,115 @@ create trigger prevent_appointment_overlap
 before insert or update of responsible_user_id, starts_at, ends_at
 on public.appointments
 for each row execute function public.prevent_appointment_overlap();
+
+-- v1.9 additions: passenger profile and flight reservations
+alter table public.profiles add column if not exists cpf text;
+alter table public.profiles add column if not exists phone text;
+alter table public.profiles add column if not exists birth_date date;
+alter table public.trips add column if not exists flight_required boolean not null default false;
+
+create table if not exists public.flight_reservations (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  trip_id uuid not null references public.trips(id) on delete cascade,
+  status text not null default 'not_requested' check (status in ('not_requested','requested','confirmed')),
+  outbound_origin text,
+  outbound_destination text,
+  outbound_date date,
+  outbound_time time,
+  return_origin text,
+  return_destination text,
+  return_date date,
+  return_time time,
+  airline text,
+  locator text,
+  outbound_flight_number text,
+  return_flight_number text,
+  requested_at timestamptz,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(trip_id)
+);
+alter table public.flight_reservations enable row level security;
+drop policy if exists "flight reservations workspace read" on public.flight_reservations;
+create policy "flight reservations workspace read" on public.flight_reservations for select using (exists(select 1 from public.trips t where t.id=trip_id and public.is_workspace_member(t.workspace_id)));
+drop policy if exists "flight reservations workspace insert" on public.flight_reservations;
+create policy "flight reservations workspace insert" on public.flight_reservations for insert with check (public.is_workspace_member(workspace_id) and exists(select 1 from public.trips t where t.id=trip_id and t.workspace_id=workspace_id));
+drop policy if exists "flight reservations workspace update" on public.flight_reservations;
+create policy "flight reservations workspace update" on public.flight_reservations for update using (exists(select 1 from public.trips t where t.id=trip_id and public.is_workspace_member(t.workspace_id))) with check (public.is_workspace_member(workspace_id) and exists(select 1 from public.trips t where t.id=trip_id and t.workspace_id=workspace_id));
+drop policy if exists "flight reservations workspace delete" on public.flight_reservations;
+create policy "flight reservations workspace delete" on public.flight_reservations for delete using (exists(select 1 from public.trips t where t.id=trip_id and public.is_workspace_member(t.workspace_id)));
+
+-- v1.9: updated_at automático da passagem.
+drop trigger if exists set_updated_at on public.flight_reservations;
+create trigger set_updated_at before update on public.flight_reservations for each row execute function public.set_updated_at();
+
+-- Em uma viagem unificada, atendimentos da mesma viagem podem compartilhar datas.
+-- Sobreposições entre compromissos fora da mesma viagem continuam bloqueadas.
+create or replace function public.prevent_appointment_overlap()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if exists (
+    select 1
+    from public.appointments a
+    where a.responsible_user_id = new.responsible_user_id
+      and a.id is distinct from new.id
+      and a.starts_at <= new.ends_at
+      and a.ends_at >= new.starts_at
+      and not exists (
+        select 1
+        from public.trip_appointments mine
+        join public.trip_appointments theirs on theirs.trip_id = mine.trip_id
+        where mine.appointment_id = new.id
+          and theirs.appointment_id = a.id
+      )
+  ) then
+    raise exception 'Período indisponível: já existe outro atendimento para este responsável nas datas selecionadas.'
+      using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists prevent_appointment_overlap on public.appointments;
+create trigger prevent_appointment_overlap
+before insert or update of responsible_user_id, starts_at, ends_at
+on public.appointments
+for each row execute function public.prevent_appointment_overlap();
+
+create or replace function public.check_appointment_conflicts(
+  target_user uuid,
+  target_start date,
+  target_end date,
+  exclude_appointment uuid default null
+)
+returns table(id uuid,title text,starts_at date,ends_at date)
+language sql stable security definer set search_path=public
+as $$
+  select a.id,a.title,a.starts_at,a.ends_at
+  from public.appointments a
+  where a.responsible_user_id=target_user
+    and a.id is distinct from exclude_appointment
+    and a.starts_at <= target_end
+    and a.ends_at >= target_start
+    and public.is_workspace_member(a.workspace_id)
+    and not (
+      exclude_appointment is not null
+      and exists (
+        select 1
+        from public.trip_appointments mine
+        join public.trip_appointments theirs on theirs.trip_id = mine.trip_id
+        where mine.appointment_id = exclude_appointment
+          and theirs.appointment_id = a.id
+      )
+    )
+  order by a.starts_at;
+$$;
+
+revoke all on function public.check_appointment_conflicts(uuid,date,date,uuid) from public;
+grant execute on function public.check_appointment_conflicts(uuid,date,date,uuid) to authenticated;

@@ -27,10 +27,10 @@ export function Layout({ children, onNewDemand }: { children: React.ReactNode; o
   const profileRef=useRef<HTMLDivElement|null>(null)
   const navigate=useNavigate()
   const { user, signOut } = useAuth()
-  const { demands, trips, notificationPreferences } = useRoutine()
+  const { demands, trips, notificationPreferences, userProfile } = useRoutine()
   const pendingItems = buildPendingItems(demands, trips, notificationPreferences)
   const notificationCount = pendingItems.length
-  const display = user?.user_metadata?.full_name || user?.email || 'Usuário'
+  const display = userProfile?.fullName || user?.user_metadata?.full_name || user?.email || 'Usuário'
 
   useEffect(() => {
     if (!notificationPreferences.pushEnabled || !('Notification' in window) || Notification.permission !== 'granted') return
@@ -41,7 +41,7 @@ export function Layout({ children, onNewDemand }: { children: React.ReactNode; o
         const notification = new Notification(`Routine Assist • ${item.title}`, { body: item.detail, icon: '/icon-192.png' })
         notification.onclick = () => {
           window.focus()
-          if (item.entityId && item.target === '/viagens') localStorage.setItem('routine-assist-focus-trip', item.entityId)
+          if (item.entityId && item.target === '/viagens') { localStorage.setItem('routine-assist-focus-trip', item.entityId); if(item.kind==='hotel'||item.kind==='vehicle'||item.kind==='flight') localStorage.setItem('routine-assist-focus-section',item.kind) }
           window.location.href = item.target
           notification.close()
         }
@@ -89,7 +89,7 @@ export function Layout({ children, onNewDemand }: { children: React.ReactNode; o
           <div className="profile-menu-wrap" ref={profileRef}>
             <button className="avatar avatar-button" aria-label="Menu do usuário" title={display} onClick={()=>setProfileOpen(v=>!v)}>{initials(display)}</button>
             {profileOpen && <div className="profile-popover">
-              <div className="profile-popover-head"><span className="avatar mini-avatar">{initials(display)}</span><div><strong>{user?.user_metadata?.full_name || 'Usuário'}</strong><small>{user?.email}</small></div></div>
+              <div className="profile-popover-head"><span className="avatar mini-avatar">{initials(display)}</span><div><strong>{userProfile?.fullName || user?.user_metadata?.full_name || 'Usuário'}</strong><small>{user?.email}</small></div></div>
               <button onClick={()=>{setProfileOpen(false);navigate('/configuracoes')}}><SettingsIcon/><span>Configurações</span></button>
               <button className="logout-action" disabled={signingOut} onClick={()=>void logout()}><LogoutIcon/><span>{signingOut?'Saindo...':'Sair do sistema'}</span></button>
             </div>}
