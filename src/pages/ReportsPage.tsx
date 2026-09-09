@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArchiveIcon, CalendarIcon, FilterIcon, ListIcon, LocationIcon, PrintIcon, RouteIcon } from '../components/Icons'
+import { ArchiveIcon, CalendarIcon, CopyIcon, FilterIcon, ListIcon, LocationIcon, PrintIcon, RouteIcon } from '../components/Icons'
 import { useRoutine } from '../context/RoutineContext'
 import { formatCompanyName } from '../lib/format'
 import { companyKey, type CompanyFilter as CompanyFilterValue } from '../lib/company'
@@ -52,6 +52,17 @@ function matchesCompany(demand: Demand | undefined, filter: CompanyFilterValue) 
 
 function sumQuantities(demands: Demand[]) {
   return demands.reduce((total, demand) => total + demandQuantity(demand), 0)
+}
+
+function groupByCentral<T>(items: T[], getDemand: (item: T) => Demand | undefined, separate: boolean) {
+  if (!separate) return [['', items] as [string, T[]]]
+  const groups = new Map<string, T[]>()
+  items.forEach(item => {
+    const demand = getDemand(item)
+    const label = demand ? formatCompanyName(demand.company) : 'Central não informada'
+    groups.set(label, [...(groups.get(label) || []), item])
+  })
+  return [...groups.entries()]
 }
 
 export function ReportsPage() {
@@ -116,6 +127,65 @@ export function ReportsPage() {
 
   const generatedAt = new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
   const totalCollars = report.uniqueDemandCollars
+  const [copied, setCopied] = useState(false)
+  const whatsappText = useMemo(() => {
+    const centralLabel = company === 'all' ? 'Todas as centrais' : company === 'alta' ? 'Central Alta' : 'Central GENEX'
+    const lines = [
+      `*${reportTitle || 'Relatório operacional'}*`,
+      `Período: ${displayDate(from)} a ${displayDate(to)}`,
+      `Central: ${centralLabel}`,
+      '',
+      '*Resumo*',
+      `• Demandas sem agendamento: ${report.demands.length} (${report.demandCollars.toLocaleString('pt-BR')} colares)`,
+      `• Visitas e atendimentos: ${report.appointments.length} (${report.appointmentCollars.toLocaleString('pt-BR')} colares)`,
+      `• Viagens programadas: ${report.trips.length} (${report.tripCollars.toLocaleString('pt-BR')} colares)`,
+      `• Total de colares: ${totalCollars.toLocaleString('pt-BR')}`,
+    ]
+    if (report.demands.length) {
+      lines.push('', '*Demandas sem agendamento*')
+      groupByCentral(report.demands, demand => demand, company === 'all').forEach(([central, demands]) => {
+        if (central) lines.push('', `*${central}*`)
+        demands.forEach(demand => lines.push(`• ${demand.client} — ${demandQuantity(demand).toLocaleString('pt-BR')} colares${demand.regional ? ` — ${demand.regional}` : ''}`))
+      })
+    }
+    if (report.appointments.length) {
+      lines.push('', '*Visitas e atendimentos*')
+      groupByCentral(report.appointments, appointment => demandForAppointment(appointment, report.demandsById), company === 'all').forEach(([central, appointments]) => {
+        if (central) lines.push('', `*${central}*`)
+        appointments.forEach(appointment => {
+          const demand = demandForAppointment(appointment, report.demandsById)
+          const place = [appointment.city, appointment.state].filter(Boolean).join('/') || 'local não informado'
+          lines.push(`• ${displayDate(dateOnly(appointment.start))} — ${appointment.farmName || appointment.client} — ${place} — ${appointment.type} — ${demandQuantity(demand).toLocaleString('pt-BR')} colares`)
+        })
+      })
+    }
+    if (report.trips.length) {
+      lines.push('', '*Viagens programadas*')
+      groupByCentral(report.trips, trip => trip.reportDemands[0], company === 'all').forEach(([central, trips]) => {
+        if (central) lines.push('', `*${central}*`)
+        trips.forEach(trip => lines.push(`• ${tripDisplayTitle(trip)} — ${displayDate(dateOnly(trip.start))} a ${displayDate(dateOnly(trip.end))} — ${trip.appointments.length} ${trip.appointments.length === 1 ? 'visita' : 'visitas'} — ${sumQuantities(trip.reportDemands).toLocaleString('pt-BR')} colares — ${trip.status === 'completed' ? 'Concluída' : 'Programada'}`))
+      })
+    }
+    lines.push('', '_Relatório gerado pelo Routine Assist_')
+    return lines.join('\n')
+  }, [company, from, report, reportTitle, to, totalCollars])
+
+  const copyWhatsapp = async () => {
+    try {
+      await navigator.clipboard.writeText(whatsappText)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = whatsappText
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      textarea.remove()
+    }
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 2200)
+  }
 
   return <div className="report-page">
     <section className="page-heading report-heading no-print">
@@ -132,6 +202,11 @@ export function ReportsPage() {
         <label className="field"><span>Central</span><select value={company} onChange={event => setCompany(event.target.value as CompanyFilterValue)}><option value="all">Todas as centrais</option><option value="alta">Alta</option><option value="genex">GENEX</option></select></label>
         <label className="field"><span>Mostrar</span><select value={scope} onChange={event => setScope(event.target.value as DemandScope)}><option value="all">Demandas e logística</option><option value="unplanned">Somente demandas sem agendamento</option><option value="scheduled">Somente visitas e viagens</option><option value="completed">Somente concluídas</option></select></label>
       </div>
+    </section>
+
+    <section className="panel whatsapp-summary no-print">
+      <div className="whatsapp-summary-head"><div><span className="eyebrow">Compartilhar</span><h2>Resumo para WhatsApp</h2><p>Texto gerado com os mesmos filtros deste relatório.</p></div><button className="primary" onClick={() => void copyWhatsapp()}><CopyIcon/> {copied ? 'Copiado' : 'Copiar texto'}</button></div>
+      <textarea className="whatsapp-summary-text" value={whatsappText} readOnly aria-label="Resumo para WhatsApp" />
     </section>
 
     <section className="report-document" aria-label="Relatório">
@@ -152,15 +227,15 @@ export function ReportsPage() {
       </div>
 
       <ReportSection title="Demandas sem agendamento" icon={<ListIcon/>} count={report.demands.length} quantity={report.demandCollars} empty="Nenhuma demanda sem agendamento neste recorte.">
-        <div className="report-table report-demand-table"><div className="report-table-head"><span>Cliente / fazenda</span><span>Central</span><span>Responsável comercial</span><span>Colares</span><span>Entrada</span></div>{report.demands.map(demand => <div className="report-table-row" key={demand.id}><div><strong>{demand.client}</strong><small>{demand.farmName || 'Fazenda não informada'}{demand.city && demand.state ? ` • ${demand.city}/${demand.state}` : ''}</small></div><span>{formatCompanyName(demand.company)}</span><span>{demand.regional || 'Não informado'}</span><strong>{demandQuantity(demand).toLocaleString('pt-BR')}</strong><span>{displayDate(dateOnly(demand.createdAt))}</span></div>)}</div>
+        {groupByCentral(report.demands, demand => demand, company === 'all').map(([central, demands]) => <div className="report-central-group" key={central || 'all'}>{central && <h4>{central}</h4>}<div className="report-table report-demand-table"><div className="report-table-head"><span>Cliente / fazenda</span><span>Central</span><span>Responsável comercial</span><span>Colares</span><span>Entrada</span></div>{demands.map(demand => <div className="report-table-row" key={demand.id}><div><strong>{demand.client}</strong><small>{demand.farmName || 'Fazenda não informada'}{demand.city && demand.state ? ` • ${demand.city}/${demand.state}` : ''}</small></div><span>{formatCompanyName(demand.company)}</span><span>{demand.regional || 'Não informado'}</span><strong>{demandQuantity(demand).toLocaleString('pt-BR')}</strong><span>{displayDate(dateOnly(demand.createdAt))}</span></div>)}</div></div>)}
       </ReportSection>
 
       <ReportSection title="Visitas e atendimentos" icon={<CalendarIcon/>} count={report.appointments.length} quantity={report.appointmentCollars} empty="Nenhuma visita agendada neste recorte.">
-        <div className="report-table"><div className="report-table-head"><span>Cliente / fazenda</span><span>Local</span><span>Tipo</span><span>Colares</span><span>Data</span></div>{report.appointments.map(appointment => { const demand = demandForAppointment(appointment, report.demandsById); return <div className="report-table-row" key={appointment.id}><div><strong>{appointment.farmName || appointment.client}</strong><small>{appointment.farmName ? appointment.client : 'Atendimento'}</small></div><span><LocationIcon/> {[appointment.city, appointment.state].filter(Boolean).join('/') || 'Não informado'}</span><span>{appointment.type}</span><strong>{demandQuantity(demand).toLocaleString('pt-BR')}</strong><span>{displayDate(dateOnly(appointment.start))}</span></div> })}</div>
+        {groupByCentral(report.appointments, appointment => demandForAppointment(appointment, report.demandsById), company === 'all').map(([central, appointments]) => <div className="report-central-group" key={central || 'all'}>{central && <h4>{central}</h4>}<div className="report-table"><div className="report-table-head"><span>Cliente / fazenda</span><span>Local</span><span>Tipo</span><span>Colares</span><span>Data</span></div>{appointments.map(appointment => { const demand = demandForAppointment(appointment, report.demandsById); return <div className="report-table-row" key={appointment.id}><div><strong>{appointment.farmName || appointment.client}</strong><small>{appointment.farmName ? appointment.client : 'Atendimento'}</small></div><span><LocationIcon/> {[appointment.city, appointment.state].filter(Boolean).join('/') || 'Não informado'}</span><span>{appointment.type}</span><strong>{demandQuantity(demand).toLocaleString('pt-BR')}</strong><span>{displayDate(dateOnly(appointment.start))}</span></div> })}</div></div>)}
       </ReportSection>
 
       <ReportSection title="Viagens programadas" icon={<RouteIcon/>} count={report.trips.length} quantity={report.tripCollars} empty="Nenhuma viagem no período selecionado.">
-        <div className="report-table report-trip-table"><div className="report-table-head"><span>Viagem</span><span>Período</span><span>Paradas</span><span>Colares</span><span>Status</span></div>{report.trips.map(trip => <div className="report-table-row" key={trip.id}><div><strong>{tripDisplayTitle(trip)}</strong><small>{trip.origin ? `Saída: ${trip.origin}` : 'Ponto de partida não informado'}</small></div><span>{displayDate(dateOnly(trip.start))} a {displayDate(dateOnly(trip.end))}</span><span>{trip.appointments.length} {trip.appointments.length === 1 ? 'visita' : 'visitas'}</span><strong>{sumQuantities(trip.reportDemands).toLocaleString('pt-BR')}</strong><span className={trip.status === 'completed' ? 'report-status done' : 'report-status'}>{trip.status === 'completed' ? 'Concluída' : 'Programada'}</span></div>)}</div>
+        {groupByCentral(report.trips, trip => trip.reportDemands[0], company === 'all').map(([central, trips]) => <div className="report-central-group" key={central || 'all'}>{central && <h4>{central}</h4>}<div className="report-table report-trip-table"><div className="report-table-head"><span>Viagem</span><span>Período</span><span>Paradas</span><span>Colares</span><span>Status</span></div>{trips.map(trip => <div className="report-table-row" key={trip.id}><div><strong>{tripDisplayTitle(trip)}</strong><small>{trip.origin ? `Saída: ${trip.origin}` : 'Ponto de partida não informado'}</small></div><span>{displayDate(dateOnly(trip.start))} a {displayDate(dateOnly(trip.end))}</span><span>{trip.appointments.length} {trip.appointments.length === 1 ? 'visita' : 'visitas'}</span><strong>{sumQuantities(trip.reportDemands).toLocaleString('pt-BR')}</strong><span className={trip.status === 'completed' ? 'report-status done' : 'report-status'}>{trip.status === 'completed' ? 'Concluída' : 'Programada'}</span></div>)}</div></div>)}
       </ReportSection>
 
       <footer className="report-document-foot"><span>Routine Assist • relatório gerado a partir dos dados selecionados</span><strong>Total geral: {totalCollars.toLocaleString('pt-BR')} colares</strong></footer>

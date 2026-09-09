@@ -30,6 +30,7 @@ export const CompassIcon = (p:P) => <svg {...base} {...p}><circle cx="12" cy="12
 export const SearchIcon = (p:P) => <svg {...base} {...p}><circle cx="10.5" cy="10.5" r="5.8"/><path d="m15 15 4.5 4.5"/></svg>
 export const ArchiveIcon = (p:P) => <svg {...base} {...p}><path d="M5 7h14v12H5z"/><path d="M4 4h16v3H4zM9 11h6"/></svg>
 export const PrintIcon = (p:P) => <svg {...base} {...p}><path d="M7 9V4h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><path d="M7 14h10v6H7z"/><path d="M17 12h.01"/></svg>
+export const CopyIcon = (p:P) => <svg {...base} {...p}><rect x="8" y="8" width="11" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h2"/></svg>
 
 export const EyeIcon = (p:P) => <svg {...base} {...p}><path d="M2.8 12s3.4-5.5 9.2-5.5 9.2 5.5 9.2 5.5-3.4 5.5-9.2 5.5S2.8 12 2.8 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
 export const EyeOffIcon = (p:P) => <svg {...base} {...p}><path d="m4 4 16 16"/><path d="M9.2 6.9A9.8 9.8 0 0 1 12 6.5c5.8 0 9.2 5.5 9.2 5.5a15.5 15.5 0 0 1-3 3.5M14.7 14.7a3.7 3.7 0 0 1-5.4-5.4M6.1 8.1A16 16 0 0 0 2.8 12s3.4 5.5 9.2 5.5a9.7 9.7 0 0 0 3-.5"/></svg>
