@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
-import { BellIcon, CalendarIcon, HomeIcon, InboxIcon, ListIcon, LogoutIcon, PlusIcon, SettingsIcon, ToolIcon, TripIcon } from './Icons'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { BellIcon, CalendarIcon, HomeIcon, InboxIcon, ListIcon, LogoutIcon, MenuIcon, PlusIcon, SettingsIcon, ToolIcon, TripIcon } from './Icons'
 import { NotificationPanel } from './NotificationPanel'
 import { useAuth } from '../context/AuthContext'
 import { useRoutine } from '../context/RoutineContext'
 import { buildPendingItems } from '../lib/pending'
 import { BrandMark } from './BrandMark'
 
-const CONTROL_TECH_URL = import.meta.env.VITE_CONTROL_TECH_URL || 'http://127.0.0.1:5174/'
+const CONTROL_TECH_URL = import.meta.env.VITE_CONTROL_TECH_URL || 'https://control-tech-assist.vercel.app/'
 
 const nav = [
   { to: '/', label: 'Início', icon: HomeIcon },
@@ -17,6 +17,8 @@ const nav = [
   { to: '/relatorios', label: 'Relatórios', icon: ListIcon },
   { to: '/integracoes', label: 'Control Tech', icon: ToolIcon },
 ]
+const mobilePrimaryNav = nav.slice(0, 4)
+const mobileSecondaryNav = nav.slice(4)
 
 function initials(nameOrEmail: string) {
   const clean = nameOrEmail.split('@')[0].trim()
@@ -27,14 +29,17 @@ function initials(nameOrEmail: string) {
 export function Layout({ children, onNewDemand }: { children: React.ReactNode; onNewDemand: () => void }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileOpen,setProfileOpen]=useState(false)
+  const [mobileMoreOpen,setMobileMoreOpen]=useState(false)
   const [signingOut,setSigningOut]=useState(false)
   const profileRef=useRef<HTMLDivElement|null>(null)
   const navigate=useNavigate()
+  const location=useLocation()
   const { user, signOut } = useAuth()
   const { demands, trips, notificationPreferences, userProfile } = useRoutine()
   const pendingItems = buildPendingItems(demands, trips, notificationPreferences)
   const notificationCount = pendingItems.length
   const display = userProfile?.fullName || user?.user_metadata?.full_name || user?.email || 'Usuário'
+  const mobileMoreActive = mobileSecondaryNav.some(item => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`))
 
   useEffect(() => {
     if (!notificationPreferences.pushEnabled || !('Notification' in window) || Notification.permission !== 'granted') return
@@ -62,6 +67,8 @@ export function Layout({ children, onNewDemand }: { children: React.ReactNode; o
     window.addEventListener('pointerdown',onPointer)
     return ()=>window.removeEventListener('pointerdown',onPointer)
   },[profileOpen])
+
+  useEffect(()=>setMobileMoreOpen(false),[location.pathname])
 
   const logout=async()=>{
     if(signingOut) return
@@ -111,8 +118,19 @@ export function Layout({ children, onNewDemand }: { children: React.ReactNode; o
     </main>
     <button className="mobile-fab" onClick={onNewDemand} aria-label="Nova demanda"><PlusIcon/></button>
     <nav className="bottom-nav" aria-label="Navegação principal">
-      {nav.map(({to,label,icon:Icon}) => <NavLink key={to} to={to} end={to==='/' } className={({isActive}) => `bottom-item ${isActive ? 'active' : ''}`}><Icon/><span>{label}</span></NavLink>)}
+      {mobilePrimaryNav.map(({to,label,icon:Icon}) => <NavLink key={to} to={to} end={to==='/' } className={({isActive}) => `bottom-item ${isActive ? 'active' : ''}`}><Icon/><span>{label}</span></NavLink>)}
+      <button type="button" className={`bottom-item bottom-more-trigger ${mobileMoreOpen || mobileMoreActive ? 'active' : ''}`} aria-expanded={mobileMoreOpen} aria-controls="bottom-more-menu" onClick={()=>setMobileMoreOpen(open=>!open)}><MenuIcon/><span>Mais</span></button>
     </nav>
+    {mobileMoreOpen && <>
+      <button type="button" className="bottom-more-scrim" aria-label="Fechar menu" onClick={()=>setMobileMoreOpen(false)} />
+      <div className="bottom-more-menu" id="bottom-more-menu">
+        {mobileSecondaryNav.map(({to,label,icon:Icon}) => <NavLink key={to} to={to} className={({isActive}) => `bottom-more-item ${isActive ? 'active' : ''}`} onClick={()=>setMobileMoreOpen(false)}><Icon/><span>{label}</span></NavLink>)}
+        <a className="bottom-more-item app" href={CONTROL_TECH_URL} target="_blank" rel="noreferrer">
+          <img src="/controltech-logo.png" alt="" />
+          <span>Abrir app ControlTech</span>
+        </a>
+      </div>
+    </>}
     <NotificationPanel open={notificationsOpen} onClose={()=>setNotificationsOpen(false)}/>
   </div>
 }

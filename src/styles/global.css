@@ -486,3 +486,16 @@
 @media(max-width:780px){.integration-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.integration-panel-head{align-items:flex-start;flex-direction:column}.integration-filter{justify-content:flex-start}.integration-table-head{display:none}.integration-row{grid-template-columns:1fr 1fr;padding:14px 16px;gap:11px}.integration-row small{display:block;font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);font-weight:900;margin-bottom:3px}.integration-row strong,.integration-row span{white-space:normal}.integration-detail-grid,.integration-history-grid{grid-template-columns:1fr 1fr}.integration-detail-actions{display:grid;grid-template-columns:1fr}.integration-detail-actions button{width:100%}}
 @media(max-width:720px){.bottom-nav{grid-template-columns:repeat(3,minmax(0,1fr))}.main{padding-bottom:126px}.mobile-fab{bottom:126px}.bottom-item span{line-height:1.1;white-space:normal}.control-tech-heading .secondary{width:100%;justify-content:center}}
 @media(max-width:560px){.integration-metrics,.integration-row,.integration-detail-grid,.integration-history-grid{grid-template-columns:1fr}.integration-detail-modal{width:calc(100vw - 16px);max-height:calc(100vh - 16px)}}
+
+/* Mobile navigation - compact primary menu */
+@media(max-width:720px){
+  .bottom-nav{grid-template-columns:repeat(5,minmax(0,1fr));z-index:45}
+  .bottom-more-trigger{border:0;background:transparent}
+  .bottom-more-scrim{position:fixed;inset:0;border:0;background:rgba(45,45,43,.18);z-index:42}
+  .bottom-more-menu{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:46;width:min(250px,calc(100vw - 32px));display:grid;gap:7px;padding:9px;border:1px solid rgba(229,222,215,.95);border-radius:16px;background:#fff;box-shadow:0 20px 54px rgba(45,45,43,.24)}
+  .bottom-more-item{display:flex;align-items:center;gap:10px;min-height:42px;padding:9px 11px;border-radius:12px;color:var(--graphite);font-size:12px;font-weight:800}
+  .bottom-more-item:hover,.bottom-more-item.active{background:#FAF1EA;color:var(--primary-dark)}
+  .bottom-more-item svg{width:18px;height:18px;flex:0 0 auto}
+  .bottom-more-item.app{border-top:1px solid var(--border);margin-top:2px;padding-top:11px}
+  .bottom-more-item.app img{width:24px;height:24px;border-radius:8px;object-fit:cover;flex:0 0 auto}
+}
