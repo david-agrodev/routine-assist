@@ -8,6 +8,7 @@ import { CalendarPage } from './pages/CalendarPage'
 import { TripsPage } from './pages/TripsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { ReportsPage } from './pages/ReportsPage'
+import { ControlTechIntegrationsPage } from './pages/ControlTechIntegrationsPage'
 import { LoginPage } from './pages/LoginPage'
 import { useAuth } from './context/AuthContext'
 import { RoutineProvider } from './context/RoutineContext'
@@ -35,6 +36,7 @@ function RoutineApp() {
         <Route path="/calendario" element={<CalendarPage/>}/>
         <Route path="/viagens" element={<TripsPage/>}/>
         <Route path="/relatorios" element={<ReportsPage/>}/>
+        <Route path="/integracoes" element={<ControlTechIntegrationsPage/>}/>
         <Route path="/configuracoes" element={<SettingsPage/>}/>
       </Routes>
       <DemandModal open={modal} onClose={() => setModal(false)}/>

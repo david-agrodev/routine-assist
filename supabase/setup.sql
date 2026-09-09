@@ -277,6 +277,29 @@ create table if not exists public.integration_links (
   unique(workspace_id,user_id,provider)
 );
 
+create table if not exists public.control_tech_integration_requests (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  demand_id uuid not null references public.demands(id) on delete cascade,
+  requested_by uuid not null references public.profiles(id) on delete restrict,
+  origin text not null default 'routine-assist',
+  destination text not null default 'control-tech-assist',
+  payload jsonb not null default '{}'::jsonb,
+  status text not null default 'pending',
+  attempts integer not null default 0,
+  last_error text,
+  external_reference text,
+  processed_at timestamptz,
+  cancelled_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint control_tech_integration_requests_status_check
+    check (status in ('pending','processing','completed','failed','cancelled')),
+  constraint control_tech_integration_requests_attempts_check check (attempts >= 0),
+  constraint control_tech_integration_requests_origin_check check (length(trim(origin)) > 0),
+  constraint control_tech_integration_requests_destination_check check (length(trim(destination)) > 0)
+);
+
 -- ============================================================
 -- Helpers de autenticação / workspace
 -- ============================================================
@@ -440,7 +463,7 @@ DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'profiles','farms','demands','appointments','trips','hotels',
-    'lodging_reservations','vehicle_reservations','notification_preferences','integration_links'
+    'lodging_reservations','vehicle_reservations','notification_preferences','integration_links','control_tech_integration_requests'
   ]
   LOOP
     EXECUTE format('drop trigger if exists set_updated_at on public.%I', t);
@@ -457,12 +480,14 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'profiles','workspaces','workspace_members','companies','commercial_contacts','clients','farms','demands',
     'appointments','trips','trip_appointments','hotels','lodging_reservations','vehicle_reservations','tasks',
-    'notification_preferences','notifications','push_subscriptions','calendar_events','integration_links'
+    'notification_preferences','notifications','push_subscriptions','calendar_events','integration_links','control_tech_integration_requests'
   ]
   LOOP
     EXECUTE format('alter table public.%I enable row level security', t);
   END LOOP;
 END $$;
+
+grant select, insert, update on table public.control_tech_integration_requests to authenticated;
 
 -- policies básicas
 DROP POLICY IF EXISTS "profiles own read" ON public.profiles;
@@ -501,6 +526,50 @@ BEGIN
   END LOOP;
 END $$;
 
+drop policy if exists "control tech integration requests members read" on public.control_tech_integration_requests;
+create policy "control tech integration requests members read"
+on public.control_tech_integration_requests
+for select
+using (public.is_workspace_member(workspace_id));
+
+drop policy if exists "control tech integration requests members insert" on public.control_tech_integration_requests;
+create policy "control tech integration requests members insert"
+on public.control_tech_integration_requests
+for insert
+with check (
+  requested_by = auth.uid()
+  and public.is_workspace_member(workspace_id)
+  and exists (
+    select 1
+    from public.demands d
+    where d.id = demand_id
+      and d.workspace_id = control_tech_integration_requests.workspace_id
+  )
+);
+
+drop policy if exists "control tech integration requests members update" on public.control_tech_integration_requests;
+create policy "control tech integration requests members update"
+on public.control_tech_integration_requests
+for update
+using (
+  public.is_workspace_member(workspace_id)
+  and exists (
+    select 1
+    from public.demands d
+    where d.id = demand_id
+      and d.workspace_id = control_tech_integration_requests.workspace_id
+  )
+)
+with check (
+  public.is_workspace_member(workspace_id)
+  and exists (
+    select 1
+    from public.demands d
+    where d.id = demand_id
+      and d.workspace_id = control_tech_integration_requests.workspace_id
+  )
+);
+
 DROP POLICY IF EXISTS "trip appointment members" ON public.trip_appointments;
 CREATE POLICY "trip appointment members" ON public.trip_appointments FOR ALL
 USING (
@@ -526,6 +595,9 @@ create index if not exists demands_created_idx on public.demands(workspace_id,cr
 create index if not exists appointments_user_dates_idx on public.appointments(responsible_user_id,starts_at,ends_at);
 create index if not exists trips_workspace_dates_idx on public.trips(workspace_id,starts_at,ends_at);
 create index if not exists tasks_open_idx on public.tasks(assigned_to,due_at) where completed_at is null;
+create index if not exists control_tech_integration_requests_workspace_status_idx on public.control_tech_integration_requests(workspace_id,status,created_at desc);
+create index if not exists control_tech_integration_requests_demand_idx on public.control_tech_integration_requests(demand_id,created_at desc);
+create index if not exists control_tech_integration_requests_requested_by_idx on public.control_tech_integration_requests(requested_by,created_at desc);
 create index if not exists notifications_user_idx on public.notifications(user_id,read_at,created_at desc);
 
 -- Final: se houver uma sessão autenticada no SQL editor não é necessário fazer nada.

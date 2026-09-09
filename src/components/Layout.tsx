@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { BellIcon, CalendarIcon, HomeIcon, InboxIcon, ListIcon, LogoutIcon, PlusIcon, SettingsIcon, TripIcon } from './Icons'
+import { BellIcon, CalendarIcon, HomeIcon, InboxIcon, ListIcon, LogoutIcon, PlusIcon, SettingsIcon, ToolIcon, TripIcon } from './Icons'
 import { NotificationPanel } from './NotificationPanel'
 import { useAuth } from '../context/AuthContext'
 import { useRoutine } from '../context/RoutineContext'
 import { buildPendingItems } from '../lib/pending'
 import { BrandMark } from './BrandMark'
+
+const CONTROL_TECH_URL = import.meta.env.VITE_CONTROL_TECH_URL || 'http://127.0.0.1:5174/'
 
 const nav = [
   { to: '/', label: 'Início', icon: HomeIcon },
@@ -13,6 +15,7 @@ const nav = [
   { to: '/calendario', label: 'Agenda', icon: CalendarIcon },
   { to: '/viagens', label: 'Viagens', icon: TripIcon },
   { to: '/relatorios', label: 'Relatórios', icon: ListIcon },
+  { to: '/integracoes', label: 'Control Tech', icon: ToolIcon },
 ]
 
 function initials(nameOrEmail: string) {
@@ -78,6 +81,10 @@ export function Layout({ children, onNewDemand }: { children: React.ReactNode; o
       <div className="brand"><img src="/routine-assist-logo.png" alt="Routine Assist" /></div>
       <nav className="nav-list">
         {nav.map(({to,label,icon:Icon}) => <NavLink key={to} to={to} end={to==='/' } className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}><Icon/><span>{label}</span></NavLink>)}
+        <a className="app-switch-link" href={CONTROL_TECH_URL} target="_blank" rel="noreferrer">
+          <img src="/controltech-logo.png" alt="" />
+          <span><strong>ControlTech</strong><small>Abrir app tecnico</small></span>
+        </a>
       </nav>
       <div className="sidebar-footer"><NavLink to="/configuracoes" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}><SettingsIcon/><span>Configurações</span></NavLink></div>
     </aside>
@@ -86,6 +93,9 @@ export function Layout({ children, onNewDemand }: { children: React.ReactNode; o
         <div className="mobile-brand"><BrandMark className="brand-mark"/><strong>Routine Assist</strong></div>
         <div className="topbar-actions">
           <button className="primary desktop-only" onClick={onNewDemand}><PlusIcon/> Nova demanda</button>
+          <a className="app-switch-button" href={CONTROL_TECH_URL} target="_blank" rel="noreferrer" aria-label="Abrir ControlTech" title="Abrir ControlTech">
+            <img src="/controltech-logo.png" alt="" />
+          </a>
           <button className="icon-button" aria-label="Notificações" onClick={()=>setNotificationsOpen(true)}><BellIcon/>{notificationCount > 0 && <span className="badge">{notificationCount > 9 ? '9+' : notificationCount}</span>}</button>
           <div className="profile-menu-wrap" ref={profileRef}>
             <button className="avatar avatar-button" aria-label="Menu do usuário" title={display} onClick={()=>setProfileOpen(v=>!v)}>{initials(display)}</button>

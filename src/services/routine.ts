@@ -5,9 +5,12 @@ import type {
   AddLodgingInput,
   Appointment,
   Company,
+  ControlTechIntegrationRequest,
   CreateDemandInput,
+  CreateControlTechIntegrationRequestInput,
   CreateTripInput,
   Demand,
+  IntegrationRequestStatus,
   SaveVehicleInput,
   SaveFlightInput,
   Trip,
@@ -22,6 +25,32 @@ function requireClient() {
   if (!supabase) throw new Error('Supabase não configurado. Verifique o arquivo .env.local.')
   return supabase
 }
+
+function mapControlTechIntegrationRequest(row: any): ControlTechIntegrationRequest {
+  const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+  return {
+    id: row.id,
+    demandId: row.demand_id,
+    requestedBy: row.requested_by,
+    requestedByName: profile?.full_name || undefined,
+    origin: row.origin,
+    destination: row.destination,
+    payload: row.payload,
+    status: row.status as IntegrationRequestStatus,
+    attempts: Number(row.attempts || 0),
+    lastError: row.last_error || undefined,
+    externalReference: row.external_reference || undefined,
+    processedAt: row.processed_at || undefined,
+    cancelledAt: row.cancelled_at || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+const controlTechIntegrationRequestSelect = `
+  id,demand_id,requested_by,origin,destination,payload,status,attempts,last_error,external_reference,processed_at,cancelled_at,created_at,updated_at,
+  profiles(full_name)
+`
 
 export async function bootstrapWorkspace(): Promise<string> {
   const client = requireClient()
@@ -126,6 +155,102 @@ export async function createDemand(workspaceId: string, user: User, input: Creat
     status: data.status,
     createdAt: data.created_at,
   }
+}
+
+export async function createControlTechIntegrationRequest(
+  workspaceId: string,
+  user: User,
+  input: CreateControlTechIntegrationRequestInput,
+): Promise<ControlTechIntegrationRequest> {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('control_tech_integration_requests')
+    .insert({
+      workspace_id: workspaceId,
+      demand_id: input.demandId,
+      requested_by: user.id,
+      origin: 'routine-assist',
+      destination: 'control-tech-assist',
+      payload: input.payload,
+      status: 'pending',
+    })
+    .select(controlTechIntegrationRequestSelect)
+    .single()
+  if (error) throw error
+
+  return mapControlTechIntegrationRequest(data)
+}
+
+export async function getControlTechIntegrationRequests(workspaceId: string): Promise<ControlTechIntegrationRequest[]> {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('control_tech_integration_requests')
+    .select(controlTechIntegrationRequestSelect)
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map(mapControlTechIntegrationRequest)
+}
+
+export async function cancelControlTechIntegrationRequest(workspaceId: string, requestId: string): Promise<ControlTechIntegrationRequest> {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('control_tech_integration_requests')
+    .update({ status: 'cancelled', cancelled_at: new Date().toISOString(), last_error: null })
+    .eq('workspace_id', workspaceId)
+    .eq('id', requestId)
+    .eq('status', 'pending')
+    .select(controlTechIntegrationRequestSelect)
+    .single()
+  if (error) throw error
+  return mapControlTechIntegrationRequest(data)
+}
+
+export async function retryControlTechIntegrationRequest(workspaceId: string, requestId: string): Promise<ControlTechIntegrationRequest> {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('control_tech_integration_requests')
+    .update({ status: 'pending', last_error: null, processed_at: null, cancelled_at: null })
+    .eq('workspace_id', workspaceId)
+    .eq('id', requestId)
+    .eq('status', 'failed')
+    .select(controlTechIntegrationRequestSelect)
+    .single()
+  if (error) throw error
+  return mapControlTechIntegrationRequest(data)
+}
+
+async function functionErrorMessage(error: any) {
+  const context = error?.context
+  if (context && typeof context.json === 'function') {
+    try {
+      const body = await context.clone().json()
+      if (body?.error) return String(body.error)
+    } catch { /* noop */ }
+  }
+  if (context && typeof context.text === 'function') {
+    try {
+      const body = await context.text()
+      if (body) return body
+    } catch { /* noop */ }
+  }
+  return error?.message || 'Não foi possível processar a solicitação.'
+}
+
+export async function processControlTechIntegrationRequest(workspaceId: string, requestId: string): Promise<ControlTechIntegrationRequest> {
+  const client = requireClient()
+  const { data: result, error } = await client.functions.invoke('process-control-tech-request', { body: { requestId } })
+  if (error) throw new Error(await functionErrorMessage(error))
+  if (result?.ok === false) throw new Error(result.error || 'Não foi possível processar a solicitação.')
+
+  const { data, error: fetchError } = await client
+    .from('control_tech_integration_requests')
+    .select(controlTechIntegrationRequestSelect)
+    .eq('workspace_id', workspaceId)
+    .eq('id', requestId)
+    .single()
+  if (fetchError) throw fetchError
+  return mapControlTechIntegrationRequest(data)
 }
 
 

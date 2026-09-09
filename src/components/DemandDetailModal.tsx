@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertIcon, CalendarIcon, CheckIcon, EditIcon, LocationIcon, PlusIcon, TrashIcon } from './Icons'
+import { AlertIcon, BuildingIcon, CalendarIcon, CheckIcon, EditIcon, LocationIcon, PlusIcon, SendIcon, TrashIcon } from './Icons'
 import { LocationFields } from './LocationFields'
 import { TravelSetupPanel } from './TravelSetupPanel'
 import { ConfirmActionModal } from './ConfirmActionModal'
@@ -9,9 +9,10 @@ import { formatCompanyName, formatDateRange, formatEquipmentSummary } from '../l
 import { isFlightReady, isHotelReady, isVehicleReady } from '../lib/tripReadiness'
 import { tripDisplayTitle } from '../lib/tripTitle'
 import { getHolidaysInRange } from '../services/holidays'
-import type { Appointment, AppointmentConflict, Demand, DemandPriority, DemandStatus, Holiday } from '../types/routine'
+import type { Appointment, AppointmentConflict, ControlTechInstallationPayload, Demand, DemandPriority, DemandStatus, Holiday } from '../types/routine'
 
 const draftKey = (id: string) => `routine-assist-demand-draft:${id}:v3`
+const CONTROL_TECH_REQUIRED_MESSAGE = 'Complete os dados da demanda antes de solicitar instalação.'
 
 type Draft = {
   tab: 'info'|'schedule'
@@ -33,7 +34,7 @@ type Draft = {
 }
 
 export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Demand | null; onClose: () => void; initialTab?: 'info'|'schedule' }) {
-  const { companies, appointments, trips, updateDemand, deleteDemand, cancelAppointment, checkAppointmentConflicts, scheduleDemand, updateAppointment } = useRoutine()
+  const { companies, appointments, trips, createControlTechIntegrationRequest, updateDemand, deleteDemand, cancelAppointment, checkAppointmentConflicts, scheduleDemand, updateAppointment } = useRoutine()
   const [tab, setTab] = useState<'info'|'schedule'>('info')
   const [client, setClient] = useState('')
   const [company, setCompany] = useState('')
@@ -61,6 +62,9 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
   const [cancelAppointmentError, setCancelAppointmentError] = useState<string | null>(null)
   const [cancelDemandOpen, setCancelDemandOpen] = useState(false)
   const [cancelDemandError, setCancelDemandError] = useState<string | null>(null)
+  const [controlTechOpen, setControlTechOpen] = useState(false)
+  const [controlTechError, setControlTechError] = useState<string | null>(null)
+  const [controlTechSuccess, setControlTechSuccess] = useState<string | null>(null)
   const [holidayPrompt, setHolidayPrompt] = useState<{ holidays: Holiday[]; mode: 'create'|'edit'; unavailable?: boolean } | null>(null)
   const initializedFor = useRef<string | null>(null)
 
@@ -92,7 +96,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
     setEnd(draft?.end ?? existingAppointment?.end ?? '')
     setType(draft?.type ?? (existingAppointment?.type === 'Remoto' ? 'Remoto' : 'Presencial'))
     setConfirmed(draft?.confirmed ?? Boolean(existingAppointment?.clientConfirmed ?? existingAppointment))
-    setConflicts([]); setChecked(false); setError(null); setCreatedAppointment(null); setDeleteOpen(false); setCancelAppointmentOpen(false); setCancelAppointmentError(null); setCancelDemandOpen(false); setCancelDemandError(null); setEditingAppointment(false)
+    setConflicts([]); setChecked(false); setError(null); setCreatedAppointment(null); setDeleteOpen(false); setCancelAppointmentOpen(false); setCancelAppointmentError(null); setCancelDemandOpen(false); setCancelDemandError(null); setControlTechOpen(false); setControlTechError(null); setControlTechSuccess(null); setEditingAppointment(false)
     initializedFor.current = demand.id
   }, [demand?.id, existingAppointment?.id])
 
@@ -136,6 +140,32 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
 
   const incomplete = [!city.trim() && 'cidade', !state.trim() && 'UF'].filter(Boolean) as string[]
   const n = (value: string) => value === '' ? undefined : Number(value)
+  const controlTechMissingFields = [
+    !client.trim() && 'cliente',
+    !company && 'central',
+    !city.trim() && 'cidade',
+    !state.trim() && 'UF',
+    !farmName.trim() && 'fazenda',
+    !(Number(quantity) > 0) && 'colares',
+  ].filter(Boolean) as string[]
+  const canRequestControlTech = controlTechMissingFields.length === 0
+  const controlTechPayload = (): ControlTechInstallationPayload => ({
+    source: 'routine-assist',
+    destination: 'control-tech-assist',
+    demandId: demand.id,
+    client: client.trim(),
+    company,
+    farmName: farmName.trim(),
+    city: city.trim(),
+    state: state.trim().toUpperCase(),
+    quantityCollars: Number(quantity),
+    commercialResponsible: regional.trim() || undefined,
+    extraAntennaCount: showExtraAntenna ? n(extraAntennaCount) : undefined,
+    observations: raw.trim() || undefined,
+    demandStatus: storedStatus,
+    nextStep: autoNextStep,
+    requestedAt: new Date().toISOString(),
+  })
   const payload = (forcedStatus?: DemandStatus, forcedNext?: string) => ({
     client: client.trim(),
     company,
@@ -157,6 +187,22 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
     try { await updateDemand(demand.id, payload()) }
     catch (e:any) { setError(e?.message || 'Não foi possível salvar a demanda.') }
     finally { setBusy(false) }
+  }
+
+  const requestControlTechInstallation = async () => {
+    if (busy) return
+    if (!canRequestControlTech) {
+      setControlTechError(CONTROL_TECH_REQUIRED_MESSAGE)
+      return
+    }
+    setBusy(true); setControlTechError(null); setError(null)
+    try {
+      await createControlTechIntegrationRequest({ demandId: demand.id, payload: controlTechPayload() })
+      setControlTechOpen(false)
+      setControlTechSuccess('Solicitação de instalação criada como pendente para o Control Tech.')
+    } catch (e:any) {
+      setControlTechError(e?.message || 'Não foi possível criar a solicitação para o Control Tech.')
+    } finally { setBusy(false) }
   }
 
   const removeDemand = async () => {
@@ -378,6 +424,16 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
 
           <label className="field raw-information-field"><span>Informações recebidas / observações</span><textarea rows={4} value={raw} onChange={e=>setRaw(e.target.value)} placeholder="Cole ou escreva aqui as informações recebidas sobre esta demanda..."/></label>
           {incomplete.length>0 && <div className="soft-note"><AlertIcon/> Ainda falta {incomplete.join(' e ')}. Você pode salvar mesmo assim.</div>}
+          <div className={`control-tech-request ${canRequestControlTech ? 'ready' : 'blocked'}`}>
+            <span className="section-icon neutral"><BuildingIcon/></span>
+            <div className="grow">
+              <span className="eyebrow">Control Tech Assist</span>
+              <strong>Solicitar instalação no Control Tech</strong>
+              <small>{canRequestControlTech ? 'Cria uma solicitação pendente para envio futuro, sem sincronizar dados automaticamente.' : `${CONTROL_TECH_REQUIRED_MESSAGE} Faltando: ${controlTechMissingFields.join(', ')}.`}</small>
+            </div>
+            <button className="secondary compact" disabled={busy || !canRequestControlTech} onClick={()=>{setControlTechError(null);setControlTechSuccess(null);setControlTechOpen(true)}}><SendIcon/> Solicitar instalação</button>
+          </div>
+          {controlTechSuccess && <div className="auth-message success"><CheckIcon/> {controlTechSuccess}</div>}
           <div className="draft-note">Rascunho salvo automaticamente neste dispositivo.</div>
           {error && <div className="auth-message error modal-error">{error}</div>}
           <div className="modal-actions demand-actions"><button className="danger-outline" disabled={busy} onClick={()=>{setError(null);setDeleteOpen(true)}}><TrashIcon/> Excluir demanda</button>{demand.status === 'cancelled' ? <button className="primary" disabled={busy} onClick={()=>void reopenDemand()}><CheckIcon/> {busy?'Reabrindo...':'Reabrir demanda'}</button> : !isScheduled && <button className="danger-outline" disabled={busy} onClick={()=>{setCancelDemandError(null);setCancelDemandOpen(true)}}><TrashIcon/> Cancelar demanda</button>}<span className="actions-spacer"/><button className="ghost" onClick={onClose}>Fechar</button>{!isScheduled && infoComplete && <button className="secondary" onClick={()=>setTab('schedule')}><CalendarIcon/> Ir para agendamento</button>}<button className="primary" disabled={!client.trim()||!company||busy} onClick={()=>void save()}>{busy?'Salvando...':'Salvar alterações'}</button></div>
@@ -393,6 +449,29 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
         </>}
       </section>
     </div>
+
+    <ConfirmActionModal
+      open={controlTechOpen}
+      title="Solicitar instalação no Control Tech?"
+      description="Confirme os dados que serão salvos como solicitação pendente. Nesta etapa nada será enviado automaticamente ao Control Tech."
+      confirmLabel="Criar solicitação pendente"
+      variant="success"
+      busy={busy}
+      error={controlTechError}
+      onCancel={()=>!busy&&setControlTechOpen(false)}
+      onConfirm={()=>void requestControlTechInstallation()}
+    >
+      <div className="control-tech-summary">
+        <div><span>Cliente</span><strong>{client.trim()}</strong></div>
+        <div><span>Fazenda</span><strong>{farmName.trim()}</strong></div>
+        <div><span>Cidade/UF</span><strong>{city.trim()}/{state.trim().toUpperCase()}</strong></div>
+        <div><span>Central</span><strong>{formatCompanyName(company)}</strong></div>
+        <div><span>Responsável comercial</span><strong>{regional.trim() || 'Não informado'}</strong></div>
+        <div><span>Colares</span><strong>{Number(quantity)}</strong></div>
+        <div><span>Antenas adicionais</span><strong>{showExtraAntenna ? n(extraAntennaCount) ?? 0 : 'Não informado'}</strong></div>
+        <div className="wide"><span>Observações</span><strong>{raw.trim() || 'Sem observações'}</strong></div>
+      </div>
+    </ConfirmActionModal>
 
     <ConfirmActionModal
       open={Boolean(holidayPrompt)}

@@ -2,8 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useAuth } from './AuthContext'
 import {
   addLodging as addLodgingDb,
+  cancelControlTechIntegrationRequest as cancelControlTechIntegrationRequestDb,
   checkAppointmentConflicts as checkAppointmentConflictsDb,
   createAppointmentFromDemand,
+  createControlTechIntegrationRequest as createControlTechIntegrationRequestDb,
   createDemand as createDemandDb,
   completeTrip as completeTripDb,
   cancelAppointment as cancelAppointmentDb,
@@ -12,17 +14,20 @@ import {
   createTrip as createTripDb,
   getAppointments,
   getCompanies,
+  getControlTechIntegrationRequests,
   getHotels,
   getNotificationPreferences,
   getUserProfile,
   getDemands,
   getTrips,
   linkAppointmentsToTrip as linkAppointmentsToTripDb,
+  processControlTechIntegrationRequest as processControlTechIntegrationRequestDb,
   unlinkAppointmentFromTrip as unlinkAppointmentFromTripDb,
   saveVehicleReservation as saveVehicleReservationDb,
   saveFlightReservation as saveFlightReservationDb,
   saveTripRoute as saveTripRouteDb,
   saveNotificationPreferences as saveNotificationPreferencesDb,
+  retryControlTechIntegrationRequest as retryControlTechIntegrationRequestDb,
   updateDemand as updateDemandDb,
   updateAppointment as updateAppointmentDb,
   updateTrip as updateTripDb,
@@ -33,6 +38,8 @@ import type {
   Appointment,
   AppointmentConflict,
   Company,
+  ControlTechIntegrationRequest,
+  CreateControlTechIntegrationRequestInput,
   CreateAppointmentInput,
   CreateDemandInput,
   CreateTripInput,
@@ -56,12 +63,17 @@ type RoutineContextValue = {
   appointments: Appointment[]
   companies: Company[]
   hotels: Hotel[]
+  controlTechIntegrationRequests: ControlTechIntegrationRequest[]
   notificationPreferences: NotificationPreferences
   userProfile: UserProfile | null
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
   createDemand: (input: CreateDemandInput) => Promise<void>
+  createControlTechIntegrationRequest: (input: CreateControlTechIntegrationRequestInput) => Promise<ControlTechIntegrationRequest>
+  cancelControlTechIntegrationRequest: (requestId: string) => Promise<ControlTechIntegrationRequest>
+  retryControlTechIntegrationRequest: (requestId: string) => Promise<ControlTechIntegrationRequest>
+  processControlTechIntegrationRequest: (requestId: string) => Promise<ControlTechIntegrationRequest>
   updateDemand: (demandId: string, input: UpdateDemandInput) => Promise<void>
   deleteDemand: (demandId: string) => Promise<void>
   deleteTrip: (tripId: string) => Promise<void>
@@ -91,6 +103,7 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [companies, setCompanies] = useState<Company[]>([])
   const [hotels, setHotels] = useState<Hotel[]>([])
+  const [controlTechIntegrationRequests, setControlTechIntegrationRequests] = useState<ControlTechIntegrationRequest[]>([])
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({ alertDays:[14,7,3,1], inAppEnabled:true, pushEnabled:false })
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(false)
@@ -101,12 +114,13 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      const [d, t, a, c, h, prefs, profile] = await Promise.all([
+      const [d, t, a, c, h, integrations, prefs, profile] = await Promise.all([
         getDemands(workspaceId),
         getTrips(workspaceId),
         getAppointments(workspaceId),
         getCompanies(workspaceId),
         getHotels(workspaceId),
+        getControlTechIntegrationRequests(workspaceId),
         user ? getNotificationPreferences(user.id) : Promise.resolve({ alertDays:[14,7,3,1], inAppEnabled:true, pushEnabled:false }),
         user ? getUserProfile(user.id) : Promise.resolve(null),
       ])
@@ -115,6 +129,7 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
       setAppointments(a)
       setCompanies(c)
       setHotels(h)
+      setControlTechIntegrationRequests(integrations)
       setNotificationPreferences(prefs)
       setUserProfile(profile)
     } catch (err: any) {
@@ -130,6 +145,34 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     if (!workspaceId || !user) throw new Error('Usuário/workspace indisponível.')
     const created = await createDemandDb(workspaceId, user, input)
     setDemands(current => [created, ...current])
+  }
+
+  const createControlTechIntegrationRequest = async (input: CreateControlTechIntegrationRequestInput) => {
+    if (!workspaceId || !user) throw new Error('Usuário/workspace indisponível.')
+    const created = await createControlTechIntegrationRequestDb(workspaceId, user, input)
+    setControlTechIntegrationRequests(current => [created, ...current])
+    return created
+  }
+
+  const cancelControlTechIntegrationRequest = async (requestId: string) => {
+    if (!workspaceId) throw new Error('Workspace indisponível.')
+    const updated = await cancelControlTechIntegrationRequestDb(workspaceId, requestId)
+    setControlTechIntegrationRequests(current => current.map(request => request.id === requestId ? updated : request))
+    return updated
+  }
+
+  const retryControlTechIntegrationRequest = async (requestId: string) => {
+    if (!workspaceId) throw new Error('Workspace indisponível.')
+    const updated = await retryControlTechIntegrationRequestDb(workspaceId, requestId)
+    setControlTechIntegrationRequests(current => current.map(request => request.id === requestId ? updated : request))
+    return updated
+  }
+
+  const processControlTechIntegrationRequest = async (requestId: string) => {
+    if (!workspaceId) throw new Error('Workspace indisponível.')
+    const updated = await processControlTechIntegrationRequestDb(workspaceId, requestId)
+    setControlTechIntegrationRequests(current => current.map(request => request.id === requestId ? updated : request))
+    return updated
   }
 
   const updateDemand = async (demandId: string, input: UpdateDemandInput) => {
@@ -254,10 +297,10 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
   }
 
   const value = useMemo(() => ({
-    demands, trips, appointments, companies, hotels, notificationPreferences, userProfile, loading, error, refresh,
-    createDemand, updateDemand, deleteDemand, deleteTrip, completeTrip, cancelAppointment, checkAppointmentConflicts, scheduleDemand, updateAppointment,
+    demands, trips, appointments, companies, hotels, controlTechIntegrationRequests, notificationPreferences, userProfile, loading, error, refresh,
+    createDemand, createControlTechIntegrationRequest, cancelControlTechIntegrationRequest, retryControlTechIntegrationRequest, processControlTechIntegrationRequest, updateDemand, deleteDemand, deleteTrip, completeTrip, cancelAppointment, checkAppointmentConflicts, scheduleDemand, updateAppointment,
     createTrip, updateTrip, linkAppointmentsToTrip, unlinkAppointmentFromTrip, addLodging, saveVehicleReservation, saveFlightReservation, saveTripRoute, saveNotificationPreferences, updateUserProfile,
-  }), [demands, trips, appointments, companies, hotels, notificationPreferences, userProfile, loading, error, refresh])
+  }), [demands, trips, appointments, companies, hotels, controlTechIntegrationRequests, notificationPreferences, userProfile, loading, error, refresh])
 
   return <RoutineContext.Provider value={value}>{children}</RoutineContext.Provider>
 }

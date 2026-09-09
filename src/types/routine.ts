@@ -144,6 +144,51 @@ export type NotificationPreferences = {
   pushEnabled: boolean
 }
 
+export type IntegrationRequestStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
+
+export type ControlTechInstallationPayload = {
+  source: 'routine-assist'
+  destination: 'control-tech-assist'
+  demandId: string
+  client: string
+  company: string
+  farmName: string
+  city: string
+  state: string
+  quantityCollars: number
+  commercialResponsible?: string
+  extraAntennaCount?: number
+  observations?: string
+  expectedDate?: string
+  appointmentStart?: string
+  demandStatus: DemandStatus
+  nextStep: string
+  requestedAt: string
+}
+
+export type ControlTechIntegrationRequest = {
+  id: string
+  demandId: string
+  requestedBy: string
+  requestedByName?: string
+  origin: string
+  destination: string
+  payload: ControlTechInstallationPayload
+  status: IntegrationRequestStatus
+  attempts: number
+  lastError?: string
+  externalReference?: string
+  processedAt?: string
+  cancelledAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type CreateControlTechIntegrationRequestInput = {
+  demandId: string
+  payload: ControlTechInstallationPayload
+}
+
 export type CreateDemandInput = {
   client: string
   company: string
