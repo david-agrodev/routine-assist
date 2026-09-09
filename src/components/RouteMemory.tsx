@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const KEY = 'routine-assist-last-path'
-const allowed = new Set(['/', '/entrada', '/calendario', '/viagens', '/configuracoes'])
+const allowed = new Set(['/', '/entrada', '/calendario', '/viagens', '/relatorios', '/configuracoes'])
 
 export function RouteMemory() {
   const location = useLocation()

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { PlusIcon, TrashIcon } from './Icons'
 import { useRoutine } from '../context/RoutineContext'
 import { formatCompanyName } from '../lib/format'
+import type { DemandPriority } from '../types/routine'
+import { PriorityStars } from './PriorityStars'
 
 const DRAFT_KEY = 'routine-assist-new-demand-draft-v3'
 
@@ -10,6 +12,7 @@ export function DemandModal({ open, onClose }: { open: boolean; onClose: () => v
   const [client, setClient] = useState('')
   const [company, setCompany] = useState('')
   const [commercialResponsible, setCommercialResponsible] = useState('')
+  const [priority, setPriority] = useState<DemandPriority>(3)
   const [quantity, setQuantity] = useState('')
   const [extraAntennaCount, setExtraAntennaCount] = useState('')
   const [showExtraAntenna, setShowExtraAntenna] = useState(false)
@@ -24,6 +27,7 @@ export function DemandModal({ open, onClose }: { open: boolean; onClose: () => v
         setClient(draft.client || '')
         setCompany(draft.company || '')
         setCommercialResponsible(draft.commercialResponsible || '')
+        setPriority(Number(draft.priority) as DemandPriority || 3)
         setQuantity(draft.quantity || '')
         setExtraAntennaCount(draft.extraAntennaCount || '')
         setShowExtraAntenna(Boolean(draft.showExtraAntenna || draft.extraAntennaCount))
@@ -35,10 +39,10 @@ export function DemandModal({ open, onClose }: { open: boolean; onClose: () => v
   useEffect(() => {
     try {
       window.localStorage.setItem(DRAFT_KEY, JSON.stringify({
-        client, company, commercialResponsible, quantity, extraAntennaCount, showExtraAntenna, raw,
+        client, company, commercialResponsible, priority, quantity, extraAntennaCount, showExtraAntenna, raw,
       }))
     } catch { /* noop */ }
-  }, [client, company, commercialResponsible, quantity, extraAntennaCount, showExtraAntenna, raw])
+  }, [client, company, commercialResponsible, priority, quantity, extraAntennaCount, showExtraAntenna, raw])
 
   if (!open) return null
 
@@ -58,11 +62,12 @@ export function DemandModal({ open, onClose }: { open: boolean; onClose: () => v
         client: client.trim(),
         company,
         regional: commercialResponsible.trim() || undefined,
+        priority,
         quantity: n(quantity),
         extraAntennaCount: showExtraAntenna ? n(extraAntennaCount) : undefined,
         raw: raw.trim() || undefined,
       })
-      setClient(''); setCompany(''); setCommercialResponsible(''); setQuantity(''); setExtraAntennaCount(''); setShowExtraAntenna(false); setRaw(''); setError(null)
+      setClient(''); setCompany(''); setCommercialResponsible(''); setPriority(3); setQuantity(''); setExtraAntennaCount(''); setShowExtraAntenna(false); setRaw(''); setError(null)
       try { window.localStorage.removeItem(DRAFT_KEY) } catch { /* noop */ }
       onClose()
     } catch (err: any) {
@@ -80,6 +85,7 @@ export function DemandModal({ open, onClose }: { open: boolean; onClose: () => v
         <label className="field"><span>Cliente *</span><input value={client} onChange={e=>setClient(e.target.value)} placeholder="Nome do cliente"/></label>
         <label className="field"><span>Central *</span><select value={company} onChange={e=>setCompany(e.target.value)}><option value="">Selecione a central</option>{companyOptions.map(c=><option key={c.id} value={c.name}>{formatCompanyName(c.name)}</option>)}</select></label>
         <label className="field"><span>Responsável comercial</span><input value={commercialResponsible} onChange={e=>setCommercialResponsible(e.target.value)} placeholder="Vendedor, regional ou distrital"/></label>
+        <PriorityStars value={priority} onChange={setPriority}/>
       </div>
 
       <div className="equipment-panel demand-items-panel">

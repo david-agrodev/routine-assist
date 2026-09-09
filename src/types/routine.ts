@@ -1,10 +1,12 @@
 export type DemandStatus = 'received' | 'waiting_info' | 'contact' | 'scheduled' | 'done' | 'cancelled'
+export type DemandPriority = 1 | 2 | 3 | 4 | 5
 
 export type Demand = {
   id: string
   client: string
   company: 'Alta' | 'GENEX' | string
   product: string
+  priority: DemandPriority
   quantity?: number
   vpuCount?: number
   uhfAntennaCount?: number
@@ -152,6 +154,7 @@ export type CreateDemandInput = {
   vpuCount?: number
   uhfAntennaCount?: number
   extraAntennaCount?: number
+  priority?: DemandPriority
 }
 
 export type UpdateDemandInput = {
@@ -165,6 +168,7 @@ export type UpdateDemandInput = {
   vpuCount?: number
   uhfAntennaCount?: number
   extraAntennaCount?: number
+  priority: DemandPriority
   raw?: string
   nextStep: string
   status: DemandStatus

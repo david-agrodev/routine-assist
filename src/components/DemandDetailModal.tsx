@@ -3,12 +3,13 @@ import { AlertIcon, CalendarIcon, CheckIcon, EditIcon, LocationIcon, PlusIcon, T
 import { LocationFields } from './LocationFields'
 import { TravelSetupPanel } from './TravelSetupPanel'
 import { ConfirmActionModal } from './ConfirmActionModal'
+import { PriorityStars } from './PriorityStars'
 import { useRoutine } from '../context/RoutineContext'
 import { formatCompanyName, formatDateRange, formatEquipmentSummary } from '../lib/format'
 import { isFlightReady, isHotelReady, isVehicleReady } from '../lib/tripReadiness'
 import { tripDisplayTitle } from '../lib/tripTitle'
 import { getHolidaysInRange } from '../services/holidays'
-import type { Appointment, AppointmentConflict, Demand, DemandStatus, Holiday } from '../types/routine'
+import type { Appointment, AppointmentConflict, Demand, DemandPriority, DemandStatus, Holiday } from '../types/routine'
 
 const draftKey = (id: string) => `routine-assist-demand-draft:${id}:v3`
 
@@ -17,6 +18,7 @@ type Draft = {
   client: string
   company: string
   regional: string
+  priority?: DemandPriority
   farmName: string
   city: string
   state: string
@@ -36,6 +38,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
   const [client, setClient] = useState('')
   const [company, setCompany] = useState('')
   const [regional, setRegional] = useState('')
+  const [priority, setPriority] = useState<DemandPriority>(3)
   const [farmName, setFarmName] = useState('')
   const [city, setCity] = useState('')
   const [state, setState] = useState('')
@@ -56,6 +59,8 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [cancelAppointmentOpen, setCancelAppointmentOpen] = useState(false)
   const [cancelAppointmentError, setCancelAppointmentError] = useState<string | null>(null)
+  const [cancelDemandOpen, setCancelDemandOpen] = useState(false)
+  const [cancelDemandError, setCancelDemandError] = useState<string | null>(null)
   const [holidayPrompt, setHolidayPrompt] = useState<{ holidays: Holiday[]; mode: 'create'|'edit'; unavailable?: boolean } | null>(null)
   const initializedFor = useRef<string | null>(null)
 
@@ -74,6 +79,8 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
     setClient(draft?.client ?? demand.client)
     setCompany(draft?.company ?? demand.company)
     setRegional(draft?.regional ?? demand.regional ?? '')
+    const savedPriority = Number(draft?.priority ?? demand.priority)
+    setPriority((savedPriority >= 1 && savedPriority <= 5 ? savedPriority : 3) as DemandPriority)
     setFarmName(draft?.farmName ?? demand.farmName ?? existingAppointment?.farmName ?? '')
     setCity(draft?.city ?? demand.city ?? '')
     setState(draft?.state ?? demand.state ?? '')
@@ -85,15 +92,15 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
     setEnd(draft?.end ?? existingAppointment?.end ?? '')
     setType(draft?.type ?? (existingAppointment?.type === 'Remoto' ? 'Remoto' : 'Presencial'))
     setConfirmed(draft?.confirmed ?? Boolean(existingAppointment?.clientConfirmed ?? existingAppointment))
-    setConflicts([]); setChecked(false); setError(null); setCreatedAppointment(null); setDeleteOpen(false); setCancelAppointmentOpen(false); setCancelAppointmentError(null); setEditingAppointment(false)
+    setConflicts([]); setChecked(false); setError(null); setCreatedAppointment(null); setDeleteOpen(false); setCancelAppointmentOpen(false); setCancelAppointmentError(null); setCancelDemandOpen(false); setCancelDemandError(null); setEditingAppointment(false)
     initializedFor.current = demand.id
   }, [demand?.id, existingAppointment?.id])
 
   useEffect(() => {
     if (!demand || initializedFor.current !== demand.id || appointment) return
-    const draft: Draft = { tab, client, company, regional, farmName, city, state, quantity, extraAntennaCount, showExtraAntenna, raw, start, end, type, confirmed }
+    const draft: Draft = { tab, client, company, regional, priority, farmName, city, state, quantity, extraAntennaCount, showExtraAntenna, raw, start, end, type, confirmed }
     try { window.localStorage.setItem(draftKey(demand.id), JSON.stringify(draft)) } catch { /* persistência opcional */ }
-  }, [demand, appointment, tab, client, company, regional, farmName, city, state, quantity, extraAntennaCount, showExtraAntenna, raw, start, end, type, confirmed])
+  }, [demand, appointment, tab, client, company, regional, priority, farmName, city, state, quantity, extraAntennaCount, showExtraAntenna, raw, start, end, type, confirmed])
 
   if (!demand) return null
 
@@ -133,6 +140,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
     client: client.trim(),
     company,
     regional: regional.trim() || undefined,
+    priority,
     farmName: farmName.trim() || undefined,
     city: city.trim() || undefined,
     state: state.trim().toUpperCase() || undefined,
@@ -172,6 +180,29 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
       setCancelAppointmentOpen(false)
       setTab('info')
     } catch (e:any) { setCancelAppointmentError(e?.message || 'Não foi possível cancelar o atendimento.') }
+    finally { setBusy(false) }
+  }
+
+  const cancelDemand = async () => {
+    if (busy) return
+    setBusy(true); setCancelDemandError(null)
+    try {
+      await updateDemand(demand.id, payload('cancelled', 'Demanda cancelada'))
+      setCancelDemandOpen(false)
+      onClose()
+    } catch (e:any) { setCancelDemandError(e?.message || 'Não foi possível cancelar a demanda.') }
+    finally { setBusy(false) }
+  }
+
+  const reopenDemand = async () => {
+    if (busy) return
+    setBusy(true); setError(null)
+    try {
+      const nextStatus: DemandStatus = infoComplete ? 'contact' : 'waiting_info'
+      const nextStep = infoComplete ? 'Combinar nova data com o cliente' : 'Completar cidade e UF'
+      await updateDemand(demand.id, payload(nextStatus, nextStep))
+      onClose()
+    } catch (e:any) { setError(e?.message || 'Não foi possível reabrir a demanda.') }
     finally { setBusy(false) }
   }
 
@@ -333,6 +364,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
             <label className="field"><span>Central *</span><select value={company} onChange={e=>setCompany(e.target.value)}><option value="">Selecione</option>{companyOptions.map(c=><option key={c.id} value={c.name}>{formatCompanyName(c.name)}</option>)}</select></label>
             <label className="field"><span>Responsável comercial</span><input value={regional} onChange={e=>setRegional(e.target.value)} placeholder="Vendedor, regional ou distrital"/></label>
             <label className="field"><span>Fazenda</span><input value={farmName} onChange={e=>setFarmName(e.target.value)} placeholder="Obrigatória antes do atendimento presencial"/></label>
+            <PriorityStars value={priority} onChange={setPriority}/>
           </div>
           <div className="location-grid"><LocationFields state={state} city={city} onStateChange={setState} onCityChange={setCity}/></div>
 
@@ -348,7 +380,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
           {incomplete.length>0 && <div className="soft-note"><AlertIcon/> Ainda falta {incomplete.join(' e ')}. Você pode salvar mesmo assim.</div>}
           <div className="draft-note">Rascunho salvo automaticamente neste dispositivo.</div>
           {error && <div className="auth-message error modal-error">{error}</div>}
-          <div className="modal-actions demand-actions"><button className="danger-outline" disabled={busy} onClick={()=>{setError(null);setDeleteOpen(true)}}><TrashIcon/> Excluir demanda</button><span className="actions-spacer"/><button className="ghost" onClick={onClose}>Fechar</button>{!isScheduled && infoComplete && <button className="secondary" onClick={()=>setTab('schedule')}><CalendarIcon/> Ir para agendamento</button>}<button className="primary" disabled={!client.trim()||!company||busy} onClick={()=>void save()}>{busy?'Salvando...':'Salvar alterações'}</button></div>
+          <div className="modal-actions demand-actions"><button className="danger-outline" disabled={busy} onClick={()=>{setError(null);setDeleteOpen(true)}}><TrashIcon/> Excluir demanda</button>{demand.status === 'cancelled' ? <button className="primary" disabled={busy} onClick={()=>void reopenDemand()}><CheckIcon/> {busy?'Reabrindo...':'Reabrir demanda'}</button> : !isScheduled && <button className="danger-outline" disabled={busy} onClick={()=>{setCancelDemandError(null);setCancelDemandOpen(true)}}><TrashIcon/> Cancelar demanda</button>}<span className="actions-spacer"/><button className="ghost" onClick={onClose}>Fechar</button>{!isScheduled && infoComplete && <button className="secondary" onClick={()=>setTab('schedule')}><CalendarIcon/> Ir para agendamento</button>}<button className="primary" disabled={!client.trim()||!company||busy} onClick={()=>void save()}>{busy?'Salvando...':'Salvar alterações'}</button></div>
         </> : <>
           {appointment && !editingAppointment ? <>
             <div className="scheduled-summary">
@@ -378,12 +410,24 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
       open={cancelAppointmentOpen}
       title="Cancelar atendimento?"
       description={`${appointment?.farmName || demand.client} será retirado da Agenda${linkedTrip ? ` e da “${tripDisplayTitle(linkedTrip)}”` : ''}.`}
-      detail={linkedTrip ? 'A viagem continuará existindo com os demais atendimentos. O nome e a rota serão atualizados automaticamente. A demanda ficará no histórico como cancelada.' : 'A demanda ficará no histórico como cancelada. Você poderá criar um novo agendamento depois, se necessário.'}
+      detail={linkedTrip ? 'A viagem continuará existindo com os demais atendimentos. O nome e a rota serão atualizados automaticamente. A demanda voltará para a fila aberta para que você possa escolher outra data.' : 'A demanda voltará para a fila aberta e poderá ser agendada novamente quando houver uma nova data.'}
       confirmLabel="Cancelar atendimento"
       busy={busy}
       error={cancelAppointmentError}
       onCancel={()=>!busy&&setCancelAppointmentOpen(false)}
       onConfirm={()=>void cancelScheduledAppointment()}
+    />
+
+    <ConfirmActionModal
+      open={cancelDemandOpen}
+      title="Cancelar demanda?"
+      description={`${demand.client} será movida para o histórico como cancelada.`}
+      detail="Use esta opção somente quando a demanda não deve mais ser acompanhada. Para trocar a data ou aguardar uma nova data, use “Cancelar atendimento”."
+      confirmLabel="Cancelar demanda"
+      busy={busy}
+      error={cancelDemandError}
+      onCancel={()=>!busy&&setCancelDemandOpen(false)}
+      onConfirm={()=>void cancelDemand()}
     />
 
     <ConfirmActionModal

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { BellIcon, CalendarIcon, HomeIcon, InboxIcon, LogoutIcon, PlusIcon, SettingsIcon, TripIcon } from './Icons'
+import { BellIcon, CalendarIcon, HomeIcon, InboxIcon, ListIcon, LogoutIcon, PlusIcon, SettingsIcon, TripIcon } from './Icons'
 import { NotificationPanel } from './NotificationPanel'
 import { useAuth } from '../context/AuthContext'
 import { useRoutine } from '../context/RoutineContext'
@@ -12,6 +12,7 @@ const nav = [
   { to: '/entrada', label: 'Entrada', icon: InboxIcon },
   { to: '/calendario', label: 'Agenda', icon: CalendarIcon },
   { to: '/viagens', label: 'Viagens', icon: TripIcon },
+  { to: '/relatorios', label: 'Relatórios', icon: ListIcon },
 ]
 
 function initials(nameOrEmail: string) {

@@ -4,14 +4,16 @@ import { DemandDetailModal } from '../components/DemandDetailModal'
 import { CompanyFilter } from '../components/CompanyFilter'
 import { useRoutine } from '../context/RoutineContext'
 import { tripDisplayTitle } from '../lib/tripTitle'
-import { formatCompanyName, formatEquipmentSummary } from '../lib/format'
+import { formatCompanyName, formatDateShort, formatEquipmentSummary } from '../lib/format'
 import { companyClass, companyKey, type CompanyFilter as CompanyFilterValue } from '../lib/company'
 import { isFlightReady, isHotelReady, isVehicleReady } from '../lib/tripReadiness'
-import type { Demand, DemandStatus, Trip } from '../types/routine'
+import type { Demand, DemandPriority, DemandStatus, Trip } from '../types/routine'
 
 type StatusFilter = 'all' | DemandStatus
 type WorkspaceTab = 'open' | 'ready' | 'completed'
 type SortOption = 'newest' | 'oldest' | 'az' | 'za' | 'next_trip'
+
+const priorityRank: Record<DemandPriority, number> = { 5: 0, 4: 1, 3: 2, 2: 3, 1: 4 }
 
 const STATUS_FILTER_KEY = 'routine-assist-inbox-filter'
 const SELECTED_KEY = 'routine-assist-inbox-selected-demand'
@@ -91,6 +93,8 @@ export function Inbox() {
     }
 
     rows = [...rows].sort((a, b) => {
+      const priorityDifference = priorityRank[a.demand.priority] - priorityRank[b.demand.priority]
+      if (priorityDifference !== 0) return priorityDifference
       if (sort === 'az') return a.demand.client.localeCompare(b.demand.client, 'pt-BR')
       if (sort === 'za') return b.demand.client.localeCompare(a.demand.client, 'pt-BR')
       if (sort === 'oldest') return (a.demand.createdAt || '').localeCompare(b.demand.createdAt || '')
@@ -146,7 +150,7 @@ export function Inbox() {
 
     <section className="demand-list">
       {paged.map(({ demand: d, stage }) => <article className={`demand-card ${companyClass(companyKey(d.company))} demand-stage-${stage.kind}`} key={d.id} onDoubleClick={() => setSelectedId(d.id)}>
-        <div className="demand-main"><div className="demand-title"><h3>{d.client}</h3><span className={`status ${stage.cls}`}>{stage.kind === 'ready' && <CheckIcon/>}{stage.label}</span></div><div className="demand-meta"><span>{formatCompanyName(d.company)}{d.product ? ` • ${d.product}` : ''}</span><span>{formatEquipmentSummary(d)}</span>{d.regional && <span>Responsável comercial: {d.regional}</span>}</div>{(!d.city || !d.state) && stage.kind === 'open' && <div className="inline-warning"><AlertIcon/> Cidade/UF ainda não informada</div>}{d.city && d.state && <div className="demand-location">{d.farmName ? `${d.farmName} • ` : ''}{d.city}/{d.state}</div>}{stage.trip && <div className="demand-trip-reference"><span>{stage.kind === 'completed' ? 'Viagem concluída' : 'Viagem'}</span><strong>{tripDisplayTitle(stage.trip)}</strong></div>}</div>
+        <div className="demand-main"><div className="demand-title"><h3>{d.client}</h3><span className="priority-badge" title={`Prioridade ${d.priority} de 5`} aria-label={`Prioridade ${d.priority} de 5`}>{Array.from({ length: 5 }, (_, index) => <span key={index} className={index < d.priority ? 'filled' : ''}>★</span>)}</span><span className={`status ${stage.cls}`}>{stage.kind === 'ready' && <CheckIcon/>}{stage.label}</span></div><div className="demand-meta"><span>{formatCompanyName(d.company)}{d.product ? ` • ${d.product}` : ''}</span><span>{formatEquipmentSummary(d)}</span>{d.regional && <span>Responsável comercial: {d.regional}</span>}<span>Entrada: {d.createdAt ? formatDateShort(d.createdAt) : '—'}</span>{stage.date && <span>{stage.trip ? 'Visita/viagem' : 'Atendimento'}: {formatDateShort(stage.date)}</span>}{stage.date && !stage.trip && <span className="appointment-type-badge">{appointments.find(a => a.demandId === d.id)?.type || 'Agenda'}</span>}</div>{(!d.city || !d.state) && stage.kind === 'open' && <div className="inline-warning"><AlertIcon/> Cidade/UF ainda não informada</div>}{d.city && d.state && <div className="demand-location">{d.farmName ? `${d.farmName} • ` : ''}{d.city}/{d.state}</div>}{stage.trip && <div className="demand-trip-reference"><span>{stage.kind === 'completed' ? 'Viagem concluída' : 'Viagem'}</span><strong>{tripDisplayTitle(stage.trip)}</strong></div>}</div>
         <div className="next-step"><span>{stage.kind === 'completed' ? 'Histórico' : 'Próximo passo'}</span><strong>{stage.next}</strong></div>
         <button className="icon-button subtle" aria-label={`Abrir ${d.client}`} onClick={() => setSelectedId(d.id)}><ArrowIcon/></button>
       </article>)}

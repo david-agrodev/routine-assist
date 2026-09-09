@@ -102,6 +102,7 @@ create table if not exists public.demands (
   raw_information text,
   notes text,
   next_step text not null default 'Completar informações',
+  priority integer not null default 3 check (priority between 1 and 5),
   status public.demand_status not null default 'received',
   received_at timestamptz not null default now(),
   created_at timestamptz not null default now(),

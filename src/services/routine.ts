@@ -46,7 +46,7 @@ export async function getDemands(workspaceId: string): Promise<Demand[]> {
   const client = requireClient()
   const { data, error } = await client
     .from('demands')
-    .select('id,client_name_snapshot,company_name_snapshot,product_name_snapshot,regional_snapshot,farm_name_snapshot,city_snapshot,state_snapshot,quantity_collars,vpu_count,uhf_antenna_count,extra_antenna_count,raw_information,next_step,status,created_at')
+    .select('id,client_name_snapshot,company_name_snapshot,product_name_snapshot,regional_snapshot,farm_name_snapshot,city_snapshot,state_snapshot,quantity_collars,vpu_count,uhf_antenna_count,extra_antenna_count,raw_information,next_step,status,priority,created_at')
     .eq('workspace_id', workspaceId)
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -55,6 +55,7 @@ export async function getDemands(workspaceId: string): Promise<Demand[]> {
     client: row.client_name_snapshot,
     company: row.company_name_snapshot || '—',
     product: row.product_name_snapshot || '',
+    priority: Math.min(5, Math.max(1, Number(row.priority) || 3)) as import('../types/routine').DemandPriority,
     regional: row.regional_snapshot || undefined,
     farmName: row.farm_name_snapshot || undefined,
     city: row.city_snapshot || undefined,
@@ -98,11 +99,12 @@ export async function createDemand(workspaceId: string, user: User, input: Creat
       vpu_count: input.vpuCount ?? null,
       uhf_antenna_count: input.uhfAntennaCount ?? null,
       extra_antenna_count: input.extraAntennaCount ?? null,
+      priority: input.priority || 3,
       raw_information: input.raw?.trim() || null,
       next_step: 'Completar informações',
       status: 'received',
     })
-    .select('id,client_name_snapshot,company_name_snapshot,product_name_snapshot,regional_snapshot,farm_name_snapshot,city_snapshot,state_snapshot,quantity_collars,vpu_count,uhf_antenna_count,extra_antenna_count,raw_information,next_step,status,created_at')
+    .select('id,client_name_snapshot,company_name_snapshot,product_name_snapshot,regional_snapshot,farm_name_snapshot,city_snapshot,state_snapshot,quantity_collars,vpu_count,uhf_antenna_count,extra_antenna_count,raw_information,next_step,status,priority,created_at')
     .single()
   if (error) throw error
   return {
@@ -110,6 +112,7 @@ export async function createDemand(workspaceId: string, user: User, input: Creat
     client: data.client_name_snapshot,
     company: data.company_name_snapshot || companyName,
     product: data.product_name_snapshot || productName,
+    priority: Math.min(5, Math.max(1, Number(data.priority) || 3)) as import('../types/routine').DemandPriority,
     regional: data.regional_snapshot || undefined,
     farmName: data.farm_name_snapshot || undefined,
     city: data.city_snapshot || undefined,
@@ -290,13 +293,14 @@ export async function updateDemand(
       vpu_count: input.vpuCount ?? null,
       uhf_antenna_count: input.uhfAntennaCount ?? null,
       extra_antenna_count: input.extraAntennaCount ?? null,
+      priority: input.priority,
       raw_information: input.raw?.trim() || null,
       next_step: input.nextStep.trim() || 'Completar informações',
       status: input.status,
     })
     .eq('workspace_id', workspaceId)
     .eq('id', demandId)
-    .select('id,client_name_snapshot,company_name_snapshot,product_name_snapshot,regional_snapshot,farm_name_snapshot,city_snapshot,state_snapshot,quantity_collars,vpu_count,uhf_antenna_count,extra_antenna_count,raw_information,next_step,status,created_at')
+    .select('id,client_name_snapshot,company_name_snapshot,product_name_snapshot,regional_snapshot,farm_name_snapshot,city_snapshot,state_snapshot,quantity_collars,vpu_count,uhf_antenna_count,extra_antenna_count,raw_information,next_step,status,priority,created_at')
     .single()
   if (error) throw error
 
@@ -317,6 +321,7 @@ export async function updateDemand(
     client: data.client_name_snapshot,
     company: data.company_name_snapshot || input.company,
     product: data.product_name_snapshot || '',
+    priority: Math.min(5, Math.max(1, Number(data.priority) || 3)) as import('../types/routine').DemandPriority,
     regional: data.regional_snapshot || undefined,
     farmName: data.farm_name_snapshot || undefined,
     city: data.city_snapshot || undefined,
@@ -628,9 +633,21 @@ export async function cancelAppointment(
 
   const targetDemandId = demandId || appointment?.demand_id
   if (targetDemandId) {
+    const { data: demand, error: demandReadError } = await client
+      .from('demands')
+      .select('city_snapshot,state_snapshot')
+      .eq('workspace_id', workspaceId)
+      .eq('id', targetDemandId)
+      .maybeSingle()
+    if (demandReadError) throw demandReadError
+
+    const hasLocation = Boolean(demand?.city_snapshot && demand?.state_snapshot)
     const { error: demandError } = await client
       .from('demands')
-      .update({ status:'cancelled', next_step:'Atendimento cancelado' })
+      .update({
+        status: hasLocation ? 'contact' : 'waiting_info',
+        next_step: hasLocation ? 'Combinar nova data com o cliente' : 'Completar cidade e UF',
+      })
       .eq('workspace_id', workspaceId)
       .eq('id', targetDemandId)
     if (demandError) throw demandError
