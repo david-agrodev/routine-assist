@@ -67,6 +67,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
   const [controlTechSuccess, setControlTechSuccess] = useState<string | null>(null)
   const [holidayPrompt, setHolidayPrompt] = useState<{ holidays: Holiday[]; mode: 'create'|'edit'; unavailable?: boolean } | null>(null)
   const initializedFor = useRef<string | null>(null)
+  const preserveScheduleTab = useRef(false)
 
   const existingAppointment = useMemo(() => {
     if (!demand) return null
@@ -76,10 +77,11 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
   const linkedTrip = useMemo(() => appointment ? trips.find(t => t.appointments.some(a => a.id === appointment.id)) || null : null, [trips, appointment])
 
   useEffect(() => {
-    if (!demand) { initializedFor.current = null; setCreatedAppointment(null); return }
+    if (!demand) { initializedFor.current = null; preserveScheduleTab.current = false; setCreatedAppointment(null); return }
     let draft: Partial<Draft> | null = null
     try { draft = JSON.parse(window.localStorage.getItem(draftKey(demand.id)) || 'null') } catch { draft = null }
-    setTab(initialTab || draft?.tab || 'info')
+    const nextTab = preserveScheduleTab.current ? 'schedule' : initialTab || draft?.tab || 'info'
+    setTab(nextTab)
     setClient(draft?.client ?? demand.client)
     setCompany(draft?.company ?? demand.company)
     setRegional(draft?.regional ?? demand.regional ?? '')
@@ -97,6 +99,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
     setType(draft?.type ?? (existingAppointment?.type === 'Remoto' ? 'Remoto' : 'Presencial'))
     setConfirmed(draft?.confirmed ?? Boolean(existingAppointment?.clientConfirmed ?? existingAppointment))
     setConflicts([]); setChecked(false); setError(null); setCreatedAppointment(null); setDeleteOpen(false); setCancelAppointmentOpen(false); setCancelAppointmentError(null); setCancelDemandOpen(false); setCancelDemandError(null); setControlTechOpen(false); setControlTechError(null); setControlTechSuccess(null); setEditingAppointment(false)
+    preserveScheduleTab.current = false
     initializedFor.current = demand.id
   }, [demand?.id, existingAppointment?.id])
 
@@ -293,6 +296,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
   const createSchedule = async () => {
     setBusy(true); setError(null)
     try {
+      preserveScheduleTab.current = true
       const created = await scheduleDemand({
         demandId: demand.id,
         client: client.trim(),
@@ -305,9 +309,10 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
         clientConfirmed: confirmed,
       })
       setCreatedAppointment(created)
+      setTab('schedule')
       setConflicts([]); setChecked(false)
       try { window.localStorage.removeItem(draftKey(demand.id)) } catch { /* noop */ }
-    } catch (e:any) { setError(e?.message || 'Não foi possível agendar o atendimento.') }
+    } catch (e:any) { preserveScheduleTab.current = false; setError(e?.message || 'Não foi possível agendar o atendimento.') }
     finally { setBusy(false) }
   }
 
@@ -335,6 +340,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
     if (!appointment) return
     setBusy(true); setError(null)
     try {
+      preserveScheduleTab.current = true
       const updated = await updateAppointment({
         appointmentId: appointment.id,
         demandId: demand.id,
@@ -343,8 +349,8 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
         city:city.trim() || undefined,
         state:state.trim().toUpperCase() || undefined,
       })
-      setCreatedAppointment(updated); setEditingAppointment(false); setConflicts([]); setChecked(false)
-    } catch(e:any){ setError(e?.message || 'Não foi possível atualizar o agendamento.') }
+      setCreatedAppointment(updated); setEditingAppointment(false); setTab('schedule'); setConflicts([]); setChecked(false)
+    } catch(e:any){ preserveScheduleTab.current = false; setError(e?.message || 'Não foi possível atualizar o agendamento.') }
     finally { setBusy(false) }
   }
 

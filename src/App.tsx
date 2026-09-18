@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { DemandModal } from './components/DemandModal'
+import { DemandDetailModal } from './components/DemandDetailModal'
 import { Dashboard } from './pages/Dashboard'
 import { Inbox } from './pages/Inbox'
 import { CalendarPage } from './pages/CalendarPage'
@@ -14,6 +15,7 @@ import { useAuth } from './context/AuthContext'
 import { RoutineProvider } from './context/RoutineContext'
 import { isSupabaseConfigured } from './lib/supabase'
 import { RouteMemory } from './components/RouteMemory'
+import type { Demand } from './types/routine'
 
 const NEW_DEMAND_OPEN_KEY = 'routine-assist-new-demand-open'
 
@@ -21,6 +23,7 @@ function RoutineApp() {
   const [modal, setModal] = useState(() => {
     try { return window.localStorage.getItem(NEW_DEMAND_OPEN_KEY) === '1' } catch { return false }
   })
+  const [createdDemand, setCreatedDemand] = useState<Demand | null>(null)
   useEffect(() => {
     try {
       if (modal) window.localStorage.setItem(NEW_DEMAND_OPEN_KEY, '1')
@@ -39,7 +42,8 @@ function RoutineApp() {
         <Route path="/integracoes" element={<ControlTechIntegrationsPage/>}/>
         <Route path="/configuracoes" element={<SettingsPage/>}/>
       </Routes>
-      <DemandModal open={modal} onClose={() => setModal(false)}/>
+      <DemandModal open={modal} onClose={() => setModal(false)} onContinue={(demand) => { setModal(false); setCreatedDemand(demand) }}/>
+      <DemandDetailModal demand={createdDemand} onClose={() => setCreatedDemand(null)}/>
     </Layout>
   </RoutineProvider>
 }

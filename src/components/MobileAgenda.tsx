@@ -1,6 +1,6 @@
 import { addDays, endOfWeek, format, isAfter, isBefore, isSameDay, isWeekend, parseISO, startOfWeek } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { CarIcon, HotelIcon, LocationIcon, PlaneIcon, RouteIcon } from './Icons'
+import { CarIcon, CheckIcon, HotelIcon, LocationIcon, PlaneIcon, RouteIcon } from './Icons'
 import { appointmentCompanyKey, companyClass, companyLabel, tripCompanyKey } from '../lib/company'
 import { compactTripClients, compactTripCommercials, compactTripStops, holidayForDate } from '../lib/calendar'
 import { tripDisplayTitle } from '../lib/tripTitle'
@@ -20,6 +20,10 @@ function rangeContext(start: string, end: string, day: Date) {
   if (isSameDay(day,e)) return `Último dia • ${range}`
   return `Em andamento • até ${format(e,'dd/MM')}`
 }
+const demandForAppointment = (appointment: Appointment, demands: Demand[]) => appointment.demandId ? demands.find(d => d.id === appointment.demandId) : undefined
+const appointmentDone = (appointment: Appointment, demands: Demand[]) => demandForAppointment(appointment, demands)?.status === 'done'
+const appointmentRemote = (appointment: Appointment) => appointment.type === 'Remoto'
+const tripDone = (trip: Trip, demands: Demand[]) => trip.appointments.length > 0 && trip.appointments.every(a => appointmentDone(a, demands))
 
 export function MobileAgenda({ compact=false, trips=[], appointments=[], demands=[], holidays=[], weekStart, onDaySelect }: { compact?: boolean; trips?: Trip[]; appointments?: Appointment[]; demands?: Demand[]; holidays?: Holiday[]; weekStart?: string | Date; onDaySelect?: (day: Date) => void }) {
   const base = startOfWeek(asDate(weekStart ?? new Date()), { weekStartsOn: 1 })
@@ -45,8 +49,8 @@ export function MobileAgenda({ compact=false, trips=[], appointments=[], demands
           <span>{format(day,'EEE',{locale:ptBR}).slice(0,3).toUpperCase()}</span><strong>{format(day,'d')}</strong>{holiday?<small>{holiday.name}</small>:<small>{isWeekend(day)?'Fim de semana':'Ver'}</small>}
         </button>
         <div className="agenda-content">
-          {dayTrips.map(t=>{const key=tripCompanyKey(t,demands); const commercial=compactTripCommercials(t,demands,2); return <button type="button" className={`agenda-trip agenda-event-button ${companyClass(key)}`} key={t.id} onClick={()=>onDaySelect?.(day)}><span className="agenda-company-line"></span><RouteIcon/><div><span className="mobile-company-badge">{companyLabel(key)}</span><strong>{compactTripStops(t,2)}</strong><span>{compactTripClients(t,2)} • {rangeContext(t.start,t.end,day)}</span>{commercial&&<small>Comercial: {commercial}</small>}<small className="agenda-trip-footer"><span>{tripDisplayTitle(t)}</span><span className="calendar-logistics-icons">{t.hotelRequired&&<i className={isHotelReady(t)?'ok':'pending'}><HotelIcon/></i>}{t.vehicleRequired&&<i className={isVehicleReady(t)?'ok':'pending'}><CarIcon/></i>}{t.flightRequired&&<i className={isFlightReady(t)?'ok':'pending'}><PlaneIcon/></i>}</span></small></div></button>})}
-          {dayAppointments.map(a=>{const key=appointmentCompanyKey(a,demands); return <button type="button" className={`agenda-appointment agenda-event-button ${companyClass(key)}`} key={a.id} onClick={()=>onDaySelect?.(day)}><span className="agenda-company-line"></span><div><span className="mobile-company-badge">{companyLabel(key)}</span><strong>{a.farmName || a.client}</strong><span>{a.client} • sem viagem</span>{(a.city||a.state)&&<small><LocationIcon/> {[a.city,a.state].filter(Boolean).join('/')}</small>}</div><b>{rangeContext(a.start,a.end,day)}</b></button>})}
+          {dayTrips.map(t=>{const key=tripCompanyKey(t,demands); const commercial=compactTripCommercials(t,demands,2); const done=tripDone(t,demands); return <button type="button" className={`agenda-trip agenda-event-button ${companyClass(key)} ${done?'calendar-event-done':''}`} key={t.id} onClick={()=>onDaySelect?.(day)}><span className="agenda-company-line"></span><RouteIcon/><div><span className="mobile-company-badge">{companyLabel(key)}</span><strong>{compactTripStops(t,2)}{done&&<span className="calendar-done-badge"><CheckIcon/> Concluída</span>}</strong><span>{compactTripClients(t,2)} • {rangeContext(t.start,t.end,day)}</span>{commercial&&<small>Comercial: {commercial}</small>}<small className="agenda-trip-footer"><span>{tripDisplayTitle(t)}</span><span className="calendar-logistics-icons">{done&&<i className="done"><CheckIcon/></i>}{t.hotelRequired&&<i className={isHotelReady(t)?'ok':'pending'}><HotelIcon/></i>}{t.vehicleRequired&&<i className={isVehicleReady(t)?'ok':'pending'}><CarIcon/></i>}{t.flightRequired&&<i className={isFlightReady(t)?'ok':'pending'}><PlaneIcon/></i>}</span></small></div></button>})}
+          {dayAppointments.map(a=>{const key=appointmentCompanyKey(a,demands); const done=appointmentDone(a,demands); const remote=appointmentRemote(a); return <button type="button" className={`agenda-appointment agenda-event-button ${companyClass(key)} ${done?'calendar-event-done':''} ${remote?'calendar-event-remote':''}`} key={a.id} onClick={()=>onDaySelect?.(day)}><span className="agenda-company-line"></span><div><span className="mobile-company-badge">{companyLabel(key)}</span><strong>{a.farmName || a.client}{remote&&<span className="calendar-remote-badge">Remoto</span>}{done&&<span className="calendar-done-badge"><CheckIcon/> Concluída</span>}</strong><span>{a.client} • {remote?'atendimento remoto':'sem viagem'}</span>{(a.city||a.state)&&<small><LocationIcon/> {[a.city,a.state].filter(Boolean).join('/')}</small>}</div><b>{rangeContext(a.start,a.end,day)}</b></button>})}
           {empty && <button type="button" className="agenda-free agenda-free-button" onClick={()=>onDaySelect?.(day)}>{holiday?holiday.name:isWeekend(day)?'Fim de semana livre':'Livre'} • ver resumo</button>}
         </div>
       </article>

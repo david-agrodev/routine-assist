@@ -440,6 +440,20 @@
 .passenger-profile-card .profile-grid{grid-template-columns:2fr 1fr 1fr 1fr;margin-top:14px}.profile-flight-note{display:flex;align-items:center;gap:9px;margin:12px 0 14px;color:var(--muted);font-size:12px}.profile-flight-note svg{width:20px;height:20px;color:var(--primary)}
 .calendar-logistics-icons{display:inline-flex;align-items:center;gap:5px;margin-left:auto}.calendar-logistics-icons i{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,.7);color:#7b746f;font-style:normal}.calendar-logistics-icons i.ok{color:#55765c}.calendar-logistics-icons i.pending{color:#b36a34;background:#fff4e6}.calendar-logistics-icons svg{width:14px;height:14px}.calendar-event-foot,.agenda-trip-footer{display:flex!important;align-items:center;gap:10px;justify-content:space-between}.calendar-event-foot em{font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.summary-commercial{margin-top:4px!important}.summary-commercial strong{color:var(--text)}
 .month-event-main{display:flex;align-items:center;gap:6px;min-width:0}.month-event-main>strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.month-event .calendar-logistics-icons i{width:18px;height:18px}.month-event .calendar-logistics-icons svg{width:12px;height:12px}
+.calendar-event-done{box-shadow:inset 0 0 0 1px rgba(78,114,85,.28)!important;background:#EEF7EF!important;border-color:#CFE5D2!important;color:#2F5F39!important}
+.calendar-event-done .agenda-company-line{background:#5B8A62!important}
+.calendar-event-done .calendar-event-icon{background:#DDEFE0!important;color:#4E7255!important}
+.calendar-logistics-icons i.done{background:#DDEFE0!important;color:#4E7255!important}
+.calendar-done-badge{display:inline-flex!important;align-items:center;gap:4px;width:max-content;max-width:100%;margin-left:7px;border-radius:999px;background:#DDEFE0;color:#4E7255;font-size:8px!important;font-weight:900;line-height:1;padding:4px 6px;vertical-align:middle;white-space:nowrap}
+.calendar-done-badge svg{width:11px!important;height:11px!important;flex:0 0 auto}
+.month-event .calendar-done-badge{margin-left:0;padding:3px 5px;font-size:7px!important}
+.agenda-trip .calendar-done-badge,.agenda-appointment .calendar-done-badge{margin-left:6px}
+.calendar-event-remote{box-shadow:inset 0 0 0 1px rgba(36,99,168,.2)!important;background:#EEF5FF!important;border-color:#C9DDF8!important;color:#173B67!important}
+.calendar-event-remote .agenda-company-line{background:#2F70B7!important}
+.calendar-remote-badge{display:inline-flex!important;align-items:center;width:max-content;max-width:100%;margin-left:7px;border-radius:999px;background:#DCEBFF;color:#1F5F9F;font-size:8px!important;font-weight:900;line-height:1;padding:4px 6px;vertical-align:middle;white-space:nowrap}
+.month-event .calendar-remote-badge{margin-left:0;padding:3px 5px;font-size:7px!important}
+.agenda-appointment .calendar-remote-badge{margin-left:6px}
+.calendar-event-done.calendar-event-remote{background:#EEF7EF!important;border-color:#CFE5D2!important;color:#2F5F39!important}
 .next-logistics-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 #trip-flight-card{scroll-margin-top:110px}
 @media(max-width:900px){.flight-grid{grid-template-columns:1fr 1fr}.passenger-profile-card .profile-grid{grid-template-columns:1fr 1fr}.passenger-profile-card .field-wide{grid-column:1/-1}}

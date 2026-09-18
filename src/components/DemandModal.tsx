@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
-import { PlusIcon, TrashIcon } from './Icons'
+import { EditIcon, PlusIcon, TrashIcon } from './Icons'
 import { useRoutine } from '../context/RoutineContext'
 import { formatCompanyName } from '../lib/format'
-import type { DemandPriority } from '../types/routine'
+import type { Demand, DemandPriority } from '../types/routine'
 import { PriorityStars } from './PriorityStars'
 
 const DRAFT_KEY = 'routine-assist-new-demand-draft-v3'
 
-export function DemandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function DemandModal({ open, onClose, onContinue }: { open: boolean; onClose: () => void; onContinue?: (demand: Demand) => void }) {
   const { createDemand, companies } = useRoutine()
   const [client, setClient] = useState('')
   const [company, setCompany] = useState('')
@@ -17,8 +17,9 @@ export function DemandModal({ open, onClose }: { open: boolean; onClose: () => v
   const [extraAntennaCount, setExtraAntennaCount] = useState('')
   const [showExtraAntenna, setShowExtraAntenna] = useState(false)
   const [raw, setRaw] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [busyAction, setBusyAction] = useState<'incomplete'|'continue'|null>(null)
   const [error, setError] = useState<string | null>(null)
+  const busy = Boolean(busyAction)
 
   useEffect(() => {
     try {
@@ -54,11 +55,11 @@ export function DemandModal({ open, onClose }: { open: boolean; onClose: () => v
 
   const n = (value: string) => value === '' ? undefined : Number(value)
 
-  const save = async () => {
+  const save = async (action: 'incomplete'|'continue') => {
     if (!client.trim() || !company || busy) return
-    setBusy(true); setError(null)
+    setBusyAction(action); setError(null)
     try {
-      await createDemand({
+      const created = await createDemand({
         client: client.trim(),
         company,
         regional: commercialResponsible.trim() || undefined,
@@ -69,10 +70,11 @@ export function DemandModal({ open, onClose }: { open: boolean; onClose: () => v
       })
       setClient(''); setCompany(''); setCommercialResponsible(''); setPriority(3); setQuantity(''); setExtraAntennaCount(''); setShowExtraAntenna(false); setRaw(''); setError(null)
       try { window.localStorage.removeItem(DRAFT_KEY) } catch { /* noop */ }
-      onClose()
+      if (action === 'continue' && onContinue) onContinue(created)
+      else onClose()
     } catch (err: any) {
       setError(err?.message || 'Não foi possível salvar a demanda.')
-    } finally { setBusy(false) }
+    } finally { setBusyAction(null) }
   }
 
   const companyOptions = companies.length ? companies : [{ id:'alta', name:'Alta' }, { id:'genex', name:'GENEX' }]
@@ -101,7 +103,7 @@ export function DemandModal({ open, onClose }: { open: boolean; onClose: () => v
 
       <div className="soft-note">Você pode salvar a demanda mesmo incompleta. Se fechar sem salvar, o rascunho continuará aqui quando voltar.</div>
       {error && <div className="auth-message error modal-error">{error}</div>}
-      <div className="modal-actions"><button className="ghost" onClick={close}>Fechar por enquanto</button><button className="primary" disabled={!client.trim() || !company || busy} onClick={() => void save()}><PlusIcon/> {busy ? 'Salvando...' : 'Salvar incompleta'}</button></div>
+      <div className="modal-actions"><button className="ghost" onClick={close}>Fechar por enquanto</button><button className="secondary" disabled={!client.trim() || !company || busy} onClick={() => void save('incomplete')}><PlusIcon/> {busyAction === 'incomplete' ? 'Salvando...' : 'Salvar incompleta'}</button><button className="primary" disabled={!client.trim() || !company || busy} onClick={() => void save('continue')}><EditIcon/> {busyAction === 'continue' ? 'Salvando...' : 'Salvar e continuar'}</button></div>
     </section>
   </div>
 }

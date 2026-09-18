@@ -69,7 +69,7 @@ type RoutineContextValue = {
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
-  createDemand: (input: CreateDemandInput) => Promise<void>
+  createDemand: (input: CreateDemandInput) => Promise<Demand>
   createControlTechIntegrationRequest: (input: CreateControlTechIntegrationRequestInput) => Promise<ControlTechIntegrationRequest>
   cancelControlTechIntegrationRequest: (requestId: string) => Promise<ControlTechIntegrationRequest>
   retryControlTechIntegrationRequest: (requestId: string) => Promise<ControlTechIntegrationRequest>
@@ -145,6 +145,7 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     if (!workspaceId || !user) throw new Error('Usuário/workspace indisponível.')
     const created = await createDemandDb(workspaceId, user, input)
     setDemands(current => [created, ...current])
+    return created
   }
 
   const createControlTechIntegrationRequest = async (input: CreateControlTechIntegrationRequestInput) => {
