@@ -3,11 +3,25 @@ import { useNavigate } from 'react-router-dom'
 import { CalendarIcon, CheckIcon, MailIcon, PlaneIcon, UserIcon } from './Icons'
 import { useRoutine } from '../context/RoutineContext'
 import { AIRFARE_RECIPIENT, buildAirfareEmail } from '../lib/outlook'
-import type { FlightReservation, FlightStatus, Trip } from '../types/routine'
+import type { FlightReservation, FlightSegment, FlightStatus, Trip } from '../types/routine'
 
 function destinationFromTrip(trip: Trip) {
   const first = trip.appointments[0]
   return first?.city ? `${first.city}${first.state ? `/${first.state}` : ''}` : ''
+}
+
+function createSegment(direction: FlightSegment['direction'], baseDate = '', baseAirline = ''): FlightSegment {
+  const randomId = window.crypto?.randomUUID?.() || `segment-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  return { id: randomId, direction, origin: '', destination: '', departureDate: baseDate || undefined, arrivalDate: baseDate || undefined, airline: baseAirline || undefined }
+}
+
+function initialSegments(existing?: FlightReservation): FlightSegment[] {
+  if (!existing) return []
+  if (existing.segments?.length) return existing.segments
+  const rows: FlightSegment[] = []
+  if (existing.outboundFlightNumber) rows.push({ id:'legacy-outbound', direction:'outbound', origin:existing.outboundOrigin || '', destination:existing.outboundDestination || '', departureDate:existing.outboundDate, departureTime:existing.outboundTime, airline:existing.airline, flightNumber:existing.outboundFlightNumber })
+  if (existing.returnFlightNumber) rows.push({ id:'legacy-return', direction:'return', origin:existing.returnOrigin || '', destination:existing.returnDestination || '', departureDate:existing.returnDate, departureTime:existing.returnTime, airline:existing.airline, flightNumber:existing.returnFlightNumber })
+  return rows
 }
 
 export function FlightModal({ trip, onClose }: { trip: Trip | null; onClose: () => void }) {
@@ -29,6 +43,7 @@ export function FlightModal({ trip, onClose }: { trip: Trip | null; onClose: () 
   const [locator,setLocator] = useState('')
   const [outboundFlightNumber,setOutboundFlightNumber] = useState('')
   const [returnFlightNumber,setReturnFlightNumber] = useState('')
+  const [segments,setSegments] = useState<FlightSegment[]>([])
   const [notes,setNotes] = useState('')
   const [busy,setBusy] = useState(false)
   const [error,setError] = useState<string|null>(null)
@@ -51,6 +66,7 @@ export function FlightModal({ trip, onClose }: { trip: Trip | null; onClose: () 
       setLocator(existing.locator || '')
       setOutboundFlightNumber(existing.outboundFlightNumber || '')
       setReturnFlightNumber(existing.returnFlightNumber || '')
+      setSegments(initialSegments(existing))
       setNotes(existing.notes || '')
       return
     }
@@ -70,14 +86,15 @@ export function FlightModal({ trip, onClose }: { trip: Trip | null; onClose: () 
       setLocator(d?.locator || '')
       setOutboundFlightNumber(d?.outboundFlightNumber || '')
       setReturnFlightNumber(d?.returnFlightNumber || '')
+      setSegments(Array.isArray(d?.segments) ? d.segments : [])
       setNotes(d?.notes || '')
     }catch{/* noop */}
   },[trip?.id,existing?.id])
 
   useEffect(()=>{
     if(!trip || existing) return
-    try{localStorage.setItem(draftKey,JSON.stringify({status,outboundOrigin,outboundDestination,outboundDate,outboundTime,returnOrigin,returnDestination,returnDate,returnTime,airline,locator,outboundFlightNumber,returnFlightNumber,notes}))}catch{/* noop */}
-  },[trip,existing,draftKey,status,outboundOrigin,outboundDestination,outboundDate,outboundTime,returnOrigin,returnDestination,returnDate,returnTime,airline,locator,outboundFlightNumber,returnFlightNumber,notes])
+    try{localStorage.setItem(draftKey,JSON.stringify({status,outboundOrigin,outboundDestination,outboundDate,outboundTime,returnOrigin,returnDestination,returnDate,returnTime,airline,locator,outboundFlightNumber,returnFlightNumber,segments,notes}))}catch{/* noop */}
+  },[trip,existing,draftKey,status,outboundOrigin,outboundDestination,outboundDate,outboundTime,returnOrigin,returnDestination,returnDate,returnTime,airline,locator,outboundFlightNumber,returnFlightNumber,segments,notes])
 
   const missingProfile = useMemo(()=>{
     const missing:string[]=[]
@@ -106,8 +123,13 @@ export function FlightModal({ trip, onClose }: { trip: Trip | null; onClose: () 
     locator:locator||undefined,
     outboundFlightNumber:outboundFlightNumber||undefined,
     returnFlightNumber:returnFlightNumber||undefined,
+    segments,
     notes:notes||undefined,
   })
+
+  const addSegment = (direction: FlightSegment['direction']) => setSegments(current => [...current, createSegment(direction, direction === 'outbound' ? outboundDate : returnDate, airline)])
+  const updateSegment = (id: string, patch: Partial<FlightSegment>) => setSegments(current => current.map(segment => segment.id === id ? { ...segment, ...patch } : segment))
+  const removeSegment = (id: string) => setSegments(current => current.filter(segment => segment.id !== id))
 
   const validateRequest=()=>{
     const missing:string[]=[]
@@ -148,6 +170,27 @@ export function FlightModal({ trip, onClose }: { trip: Trip | null; onClose: () 
     }
   }
 
+  const segmentFields = (direction: FlightSegment['direction']) => {
+    const rows = segments.filter(segment => segment.direction === direction)
+    return <div className="flight-segment-group">
+      <div className="flight-segment-group-head"><strong>{direction === 'outbound' ? 'Trechos da ida' : 'Trechos da volta'}</strong><button type="button" className="secondary compact" onClick={()=>addSegment(direction)}><PlaneIcon/> Adicionar trecho</button></div>
+      {rows.length === 0 ? <p className="trip-empty-copy">Nenhum trecho informado ainda.</p> : rows.map((segment, index) => <div className="flight-segment-card" key={segment.id}>
+        <div className="flight-segment-index"><span>{index + 1}</span><strong>{direction === 'outbound' ? 'Ida' : 'Volta'}</strong></div>
+        <div className="form-grid flight-segment-grid">
+          <label className="field"><span>Origem</span><input value={segment.origin} onChange={e=>updateSegment(segment.id,{origin:e.target.value})} placeholder="Ex.: Uberlândia/MG - UDI"/></label>
+          <label className="field"><span>Destino</span><input value={segment.destination} onChange={e=>updateSegment(segment.id,{destination:e.target.value})} placeholder="Ex.: Campinas/SP - VCP"/></label>
+          <label className="field"><span>Saída</span><input type="date" value={segment.departureDate || ''} onChange={e=>updateSegment(segment.id,{departureDate:e.target.value || undefined})}/></label>
+          <label className="field"><span>Hora saída</span><input type="time" value={segment.departureTime || ''} onChange={e=>updateSegment(segment.id,{departureTime:e.target.value || undefined})}/></label>
+          <label className="field"><span>Chegada</span><input type="date" value={segment.arrivalDate || ''} onChange={e=>updateSegment(segment.id,{arrivalDate:e.target.value || undefined})}/></label>
+          <label className="field"><span>Hora chegada</span><input type="time" value={segment.arrivalTime || ''} onChange={e=>updateSegment(segment.id,{arrivalTime:e.target.value || undefined})}/></label>
+          <label className="field"><span>Companhia</span><input value={segment.airline || ''} onChange={e=>updateSegment(segment.id,{airline:e.target.value || undefined})} placeholder="Ex.: Azul"/></label>
+          <label className="field"><span>Nº do voo</span><input value={segment.flightNumber || ''} onChange={e=>updateSegment(segment.id,{flightNumber:e.target.value || undefined})} placeholder="Ex.: AD 1234"/></label>
+        </div>
+        <button type="button" className="mini-link-button danger flight-segment-remove" onClick={()=>removeSegment(segment.id)}>Remover trecho</button>
+      </div>)}
+    </div>
+  }
+
   return <div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&!busy&&onClose()}>
     <section className="modal-card flight-modal-card">
       <div className="modal-head"><div><span className="eyebrow">Passagem aérea</span><h2>Organizar voo</h2><p>O Routine monta a solicitação e abre o Outlook já endereçado para a responsável pela reserva.</p></div><button className="close" onClick={onClose}>×</button></div>
@@ -167,6 +210,12 @@ export function FlightModal({ trip, onClose }: { trip: Trip | null; onClose: () 
       <div className="flight-form-section">
         <div className="lodging-section-title"><span className="section-icon neutral"><CheckIcon/></span><div><strong>Reserva</strong><small>Preencha estes dados quando a Keyla confirmar a emissão.</small></div></div>
         <div className="form-grid flight-grid"><label className="field"><span>Status</span><select value={status} onChange={e=>setStatus(e.target.value as FlightStatus)}><option value="not_requested">Ainda não solicitei</option><option value="requested">E-mail enviado</option><option value="confirmed">Passagem confirmada</option></select></label><label className="field"><span>Companhia aérea</span><input value={airline} onChange={e=>setAirline(e.target.value)} placeholder="Opcional"/></label><label className="field"><span>Localizador</span><input value={locator} onChange={e=>setLocator(e.target.value)} placeholder="Opcional"/></label><label className="field"><span>Voo ida</span><input value={outboundFlightNumber} onChange={e=>setOutboundFlightNumber(e.target.value)} placeholder="Ex.: AD 1234"/></label><label className="field"><span>Voo volta</span><input value={returnFlightNumber} onChange={e=>setReturnFlightNumber(e.target.value)} placeholder="Ex.: AD 4321"/></label><label className="field field-wide"><span>Observações para a passagem</span><textarea rows={3} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Ex.: preciso chegar antes das 10h para retirar o veículo no aeroporto."/></label></div>
+      </div>
+
+      <div className="flight-form-section flight-segments-section">
+        <div className="lodging-section-title"><span className="section-icon terracotta"><PlaneIcon/></span><div><strong>Trechos do bilhete emitido</strong><small>Use estes campos depois que receber o ticket. Registre cada conexão separadamente.</small></div></div>
+        <div className="flight-segment-help">Ex.: Ida: Uberlândia/MG - UDI {'->'} Campinas/SP - VCP {'->'} Londrina/PR - LDB. Volta: Londrina/PR - LDB {'->'} Campinas/SP - VCP {'->'} Uberlândia/MG - UDI.</div>
+        <div className="flight-segments-layout">{segmentFields('outbound')}{segmentFields('return')}</div>
       </div>
 
       <div className="flight-email-preview"><MailIcon/><div><strong>Solicitação pelo Outlook</strong><span>Destinatário: {AIRFARE_RECIPIENT}</span><small>O assunto inclui passageiro, origem, destino e período. O corpo leva seus dados do Perfil e os horários desejados.</small></div></div>

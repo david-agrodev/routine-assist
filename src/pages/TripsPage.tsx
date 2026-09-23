@@ -1,5 +1,5 @@
 import { differenceInCalendarDays, format, parseISO } from 'date-fns'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   BuildingIcon,
@@ -219,10 +219,16 @@ export function TripsPage(){
   const vehicleReady = isVehicleReady(selected)
   const flightReady = isFlightReady(selected)
   const clientDatesReady = selected.appointments.length > 0 && selected.appointments.every(a => a.clientConfirmed !== false)
-  const readinessChecks = [selected.appointments.length>0, clientDatesReady, hotelReady, vehicleReady, ...(selected.flightRequired?[flightReady]:[])]
+  const readinessChecks = [selected.appointments.length>0, clientDatesReady, ...(selected.hotelRequired?[hotelReady]:[]), ...(selected.vehicleRequired?[vehicleReady]:[]), ...(selected.flightRequired?[flightReady]:[])]
   const readinessDone = readinessChecks.filter(Boolean).length
   const readiness = Math.round((readinessDone/readinessChecks.length)*100)
   const companyKey=tripCompanyKey(selected,demands)
+  const flightSegments = flight?.segments || []
+  const logisticsItems = [
+    selected.hotelRequired ? { key:'hotel', label:'Hospedagem', ready:hotelReady, text:hotelReady?'Organizada':'Pendente', icon:<HotelIcon/> } : null,
+    selected.vehicleRequired ? { key:'vehicle', label:'Veículo', ready:vehicleReady, text:vehicleReady?'Organizado':'Pendente', icon:<CarIcon/> } : null,
+    selected.flightRequired ? { key:'flight', label:'Passagem', ready:flightReady, text:flightReady?'Organizada':'Pendente', icon:<PlaneIcon/> } : null,
+  ].filter(Boolean) as { key:string; label:string; ready:boolean; text:string; icon:ReactNode }[]
 
   return <>
     {pageHeader}
@@ -242,6 +248,7 @@ export function TripsPage(){
         </div>
       </header>
       {selected.status==='completed'&&<div className="trip-completed-banner"><CheckIcon/><div><strong>Viagem concluída</strong><span>{selected.completedAt ? `Concluída em ${new Date(selected.completedAt).toLocaleDateString('pt-BR')}` : 'Esta viagem está arquivada no histórico.'}</span></div></div>}
+      {logisticsItems.length>0&&<div className="trip-logistics-summary"><span className="section-label">Logística necessária</span><div>{logisticsItems.map(item=><span key={item.key} className={`logistics-chip ${item.ready?'ready':'pending'}`}>{item.icon}<strong>{item.label}</strong><small>{item.text}</small></span>)}</div></div>}
 
       <div className="trip-workspace-grid">
         <article className="trip-work-card appointments-card">
@@ -252,7 +259,7 @@ export function TripsPage(){
           <div className="trip-work-card-actions"><button className="secondary compact no-margin" onClick={()=>setLinkTrip(selected)}><PlusIcon/> Adicionar atendimento</button></div>
         </article>
 
-        <article id="trip-hotel-card" className={`trip-work-card lodging-card ${hotelReady?'is-ready':'needs-action'}`}>
+        {selected.hotelRequired&&<article id="trip-hotel-card" className={`trip-work-card lodging-card ${hotelReady?'is-ready':'needs-action'}`}>
           <div className="trip-work-card-head"><span className={`trip-card-icon ${hotelReady?'neutral':'warn'}`}><HotelIcon/></span><div><span className="section-label">Hospedagem</span><h3>{selected.hotelRequired ? selected.lodgings.length ? 'Hospedagem cadastrada' : 'Hotel pendente' : 'Não necessária'}</h3></div>{hotelReady&&<span className="ready-pill"><CheckIcon/> Organizado</span>}</div>
           <div className="trip-work-card-body">
             {selected.hotelRequired ? selected.lodgings.length ? selected.lodgings.map((stay,index)=>{
@@ -266,23 +273,24 @@ export function TripsPage(){
             }) : <p className="trip-empty-copy">Cadastre hotel, período, endereço e valor da reserva.</p> : <p className="trip-empty-copy">Esta viagem foi marcada sem necessidade de hospedagem.</p>}
           </div>
           {selected.hotelRequired&&<div className="trip-work-card-actions"><button className={selected.lodgings.length?'secondary compact no-margin':'primary compact no-margin'} onClick={()=>{setEditingLodging(null);setLodgingTrip(selected)}}><HotelIcon/> {selected.lodgings.length?'Adicionar hospedagem':'Cadastrar hospedagem'}</button></div>}
-        </article>
+        </article>}
 
-        <article id="trip-vehicle-card" className={`trip-work-card vehicle-card ${vehicleReady?'is-ready':'needs-action'}`}>
+        {selected.vehicleRequired&&<article id="trip-vehicle-card" className={`trip-work-card vehicle-card ${vehicleReady?'is-ready':'needs-action'}`}>
           <div className="trip-work-card-head"><span className={`trip-card-icon ${vehicleReady?'neutral':'terracotta'}`}><CarIcon/></span><div><span className="section-label">Veículo</span><h3>{selected.vehicleRequired ? vehicle ? vehicle.status==='confirmed'?'Reserva confirmada':vehicle.status==='requested'?'Solicitação enviada':vehicle.status==='picked_up'?'Veículo retirado':vehicle.status==='returned'?'Veículo devolvido':'Veículo registrado' : 'Solicitação pendente' : 'Não necessário'}</h3></div>{vehicleReady&&<span className="ready-pill"><CheckIcon/> Organizado</span>}</div>
           <div className="trip-work-card-body">
             {selected.vehicleRequired ? vehicle ? <div className="vehicle-summary-v14"><div className="vehicle-company"><CarIcon/><div><small>Locadora</small><strong>{vehicle.company || 'Ainda não definida'}</strong></div></div><div className="vehicle-stat-grid">{vehicle.locator&&<span><small>Localizador</small><strong>{vehicle.locator}</strong></span>}{vehicle.requestedAt&&<span><small>Solicitado em</small><strong>{new Date(vehicle.requestedAt).toLocaleDateString('pt-BR')}</strong></span>}{vehicle.pickupLocation&&<span><small>Retirada</small><strong>{vehicle.pickupLocation}</strong></span>}</div></div> : <p className="trip-empty-copy">Abra o Forms corporativo para solicitar o veículo e depois atualize o status no Routine.</p> : <p className="trip-empty-copy">Esta viagem não exige reserva de veículo.</p>}
           </div>
           {selected.vehicleRequired&&<div className="trip-work-card-actions split"><a className="primary compact no-margin" href={VEHICLE_FORM_URL} target="_blank" rel="noreferrer"><CarIcon/> Abrir Forms ↗</a><button className="secondary compact no-margin" onClick={()=>setVehicleTrip(selected)}>Atualizar veículo</button></div>}
-        </article>
+        </article>}
 
-        <article id="trip-flight-card" className={`trip-work-card flight-card ${flightReady?'is-ready':'needs-action'}`}>
+        {selected.flightRequired&&<article id="trip-flight-card" className={`trip-work-card flight-card ${flightReady?'is-ready':'needs-action'}`}>
           <div className="trip-work-card-head"><span className={`trip-card-icon ${flightReady?'neutral':'terracotta'}`}><PlaneIcon/></span><div><span className="section-label">Passagem aérea</span><h3>{selected.flightRequired ? flight ? flight.status==='confirmed'?'Passagem confirmada':flight.status==='requested'?'Solicitação enviada':'Solicitação pendente' : 'Solicitação pendente' : 'Não necessária'}</h3></div>{flightReady&&<span className="ready-pill"><CheckIcon/> Organizado</span>}</div>
           <div className="trip-work-card-body">
             {selected.flightRequired ? flight ? <div className="flight-summary"><div><small>Ida</small><strong>{flight.outboundOrigin||'Origem a definir'} → {flight.outboundDestination||'Destino a definir'}</strong><span>{flight.outboundDate?flight.outboundDate.split('-').reverse().join('/'):'Data a definir'}{flight.outboundTime?` • ${flight.outboundTime}`:''}</span></div><div><small>Retorno</small><strong>{flight.returnOrigin||flight.outboundDestination||'Origem a definir'} → {flight.returnDestination||flight.outboundOrigin||'Destino a definir'}</strong><span>{flight.returnDate?flight.returnDate.split('-').reverse().join('/'):'Data a definir'}{flight.returnTime?` • ${flight.returnTime}`:''}</span></div>{flight.locator&&<div><small>Localizador</small><strong>{flight.locator}</strong><span>{flight.airline||'Companhia não informada'}</span></div>}</div> : <p className="trip-empty-copy">Informe os horários desejados e deixe o Routine montar a solicitação para o Outlook.</p> : <p className="trip-empty-copy">Esta viagem não exige passagem aérea.</p>}
+            {flightSegments.length>0&&<div className="flight-segments-summary">{flightSegments.map((segment,index)=><div key={segment.id}><i>{index+1}</i><span><strong>{segment.origin || 'Origem'} → {segment.destination || 'Destino'}</strong><small>{segment.direction === 'outbound' ? 'Ida' : 'Volta'}{segment.flightNumber?` • ${segment.flightNumber}`:''}{segment.airline?` • ${segment.airline}`:''}{segment.departureDate?` • ${segment.departureDate.split('-').reverse().join('/')}`:''}{segment.departureTime?` ${segment.departureTime}`:''}{segment.arrivalTime?` → ${segment.arrivalTime}`:''}</small></span></div>)}</div>}
           </div>
           {selected.flightRequired&&<div className="trip-work-card-actions"><button className={flight?'secondary compact no-margin':'primary compact no-margin'} onClick={()=>setFlightTrip(selected)}>{flight?<PlaneIcon/>:<MailIcon/>} {flight?'Atualizar passagem':'Solicitar passagem'}</button></div>}
-        </article>
+        </article>}
 
         <article className="trip-work-card route-card route-card-v16">
           <div className="trip-work-card-head"><span className="trip-card-icon neutral"><CompassIcon/></span><div><span className="section-label">Rota da viagem</span><h3>{selected.appointments.length ? 'Ponto de partida e paradas' : 'Rota ainda vazia'}</h3></div></div>
@@ -296,7 +304,7 @@ export function TripsPage(){
         </article>
       </div>
 
-      <footer className="trip-status-strip"><span className={selected.appointments.length?'ok':'pending'}><CheckIcon/> {selected.appointments.length?'Atendimentos vinculados':'Atendimentos pendentes'}</span><span className={hotelReady?'ok':'pending'}><HotelIcon/> {hotelReady?'Hotel organizado':'Hotel pendente'}</span><span className={vehicleReady?'ok':'pending'}><CarIcon/> {vehicleReady?'Veículo organizado':'Veículo pendente'}</span>{selected.flightRequired&&<span className={flightReady?'ok':'pending'}><PlaneIcon/> {flightReady?'Passagem organizada':'Passagem pendente'}</span>}</footer>
+      <footer className="trip-status-strip"><span className={selected.appointments.length?'ok':'pending'}><CheckIcon/> {selected.appointments.length?'Atendimentos vinculados':'Atendimentos pendentes'}</span>{selected.hotelRequired&&<span className={hotelReady?'ok':'pending'}><HotelIcon/> {hotelReady?'Hotel organizado':'Hotel pendente'}</span>}{selected.vehicleRequired&&<span className={vehicleReady?'ok':'pending'}><CarIcon/> {vehicleReady?'Veículo organizado':'Veículo pendente'}</span>}{selected.flightRequired&&<span className={flightReady?'ok':'pending'}><PlaneIcon/> {flightReady?'Passagem organizada':'Passagem pendente'}</span>}</footer>
     </section>
 
     <CreateTripModal open={createOpen} onClose={()=>setCreateOpen(false)}/>

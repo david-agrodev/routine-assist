@@ -43,6 +43,12 @@ export function buildAirfareEmail(profile: UserProfile | null, trip: Trip, fligh
     `Data: ${brDate(returnDate)}`,
     `Horário desejado: ${flight.returnTime || 'Não informado'}`,
   ]
+  if (flight.segments?.length) {
+    lines.push('', 'TRECHOS DO BILHETE')
+    flight.segments.forEach((segment, index) => {
+      lines.push(`${index + 1}. ${segment.direction === 'return' ? 'Volta' : 'Ida'}: ${segment.origin || 'Origem não informada'} -> ${segment.destination || 'Destino não informado'} | Saída: ${brDate(segment.departureDate)} ${segment.departureTime || ''} | Chegada: ${brDate(segment.arrivalDate)} ${segment.arrivalTime || ''} | Voo: ${segment.flightNumber || 'Não informado'}${segment.airline ? ` | ${segment.airline}` : ''}`)
+    })
+  }
   if (flight.notes?.trim()) lines.push('', `Observação: ${flight.notes.trim()}`)
   lines.push(
     '',

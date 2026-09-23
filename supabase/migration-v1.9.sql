@@ -25,12 +25,15 @@ create table if not exists public.flight_reservations (
   locator text,
   outbound_flight_number text,
   return_flight_number text,
+  segments jsonb not null default '[]'::jsonb,
   requested_at timestamptz,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  constraint flight_reservations_segments_array_check check (jsonb_typeof(segments) = 'array'),
   unique(trip_id)
 );
+alter table public.flight_reservations add column if not exists segments jsonb not null default '[]'::jsonb;
 
 alter table public.flight_reservations enable row level security;
 

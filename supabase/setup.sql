@@ -656,12 +656,27 @@ create table if not exists public.flight_reservations (
   locator text,
   outbound_flight_number text,
   return_flight_number text,
+  segments jsonb not null default '[]'::jsonb,
   requested_at timestamptz,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  constraint flight_reservations_segments_array_check check (jsonb_typeof(segments) = 'array'),
   unique(trip_id)
 );
+alter table public.flight_reservations add column if not exists segments jsonb not null default '[]'::jsonb;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'flight_reservations_segments_array_check'
+      and conrelid = 'public.flight_reservations'::regclass
+  ) then
+    alter table public.flight_reservations
+      add constraint flight_reservations_segments_array_check
+      check (jsonb_typeof(segments) = 'array');
+  end if;
+end $$;
 alter table public.flight_reservations enable row level security;
 drop policy if exists "flight reservations workspace read" on public.flight_reservations;
 create policy "flight reservations workspace read" on public.flight_reservations for select using (exists(select 1 from public.trips t where t.id=trip_id and public.is_workspace_member(t.workspace_id)));

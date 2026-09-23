@@ -32,6 +32,23 @@ function asArray<T = any>(value: T | T[] | null | undefined): T[] {
   return [value]
 }
 
+function normalizeFlightSegments(value: any) {
+  return asArray<any>(value)
+    .map((segment, index) => ({
+      id: String(segment?.id || `segment-${index + 1}`),
+      direction: segment?.direction === 'return' ? 'return' as const : 'outbound' as const,
+      origin: String(segment?.origin || '').trim(),
+      destination: String(segment?.destination || '').trim(),
+      departureDate: segment?.departureDate || undefined,
+      departureTime: segment?.departureTime || undefined,
+      arrivalDate: segment?.arrivalDate || undefined,
+      arrivalTime: segment?.arrivalTime || undefined,
+      airline: segment?.airline ? String(segment.airline).trim() : undefined,
+      flightNumber: segment?.flightNumber ? String(segment.flightNumber).trim() : undefined,
+    }))
+    .filter(segment => segment.origin || segment.destination || segment.flightNumber)
+}
+
 function mapControlTechIntegrationRequest(row: any): ControlTechIntegrationRequest {
   const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
   return {
@@ -298,7 +315,7 @@ export async function getTrips(workspaceId: string): Promise<Trip[]> {
         hotels(name,address,city,state,phone)
       ),
       vehicle_reservations(id,status,rental_company,locator,requested_at,pickup_at,return_at,pickup_location,notes),
-      flight_reservations(id,status,outbound_origin,outbound_destination,outbound_date,outbound_time,return_origin,return_destination,return_date,return_time,airline,locator,outbound_flight_number,return_flight_number,requested_at,notes)
+      flight_reservations(id,status,outbound_origin,outbound_destination,outbound_date,outbound_time,return_origin,return_destination,return_date,return_time,airline,locator,outbound_flight_number,return_flight_number,segments,requested_at,notes)
     `)
     .eq('workspace_id', workspaceId)
     .order('starts_at', { ascending: true })
@@ -371,6 +388,7 @@ export async function getTrips(workspaceId: string): Promise<Trip[]> {
       locator: f.locator || undefined,
       outboundFlightNumber: f.outbound_flight_number || undefined,
       returnFlightNumber: f.return_flight_number || undefined,
+      segments: normalizeFlightSegments(f.segments),
       requestedAt: f.requested_at || undefined,
       notes: f.notes || undefined,
     }))
@@ -930,6 +948,7 @@ export async function saveFlightReservation(workspaceId: string, input: SaveFlig
     locator: input.locator?.trim() || null,
     outbound_flight_number: input.outboundFlightNumber?.trim() || null,
     return_flight_number: input.returnFlightNumber?.trim() || null,
+    segments: normalizeFlightSegments(input.segments),
     requested_at: input.status === 'not_requested' ? null : new Date().toISOString(),
     notes: input.notes?.trim() || null,
     updated_at: new Date().toISOString(),

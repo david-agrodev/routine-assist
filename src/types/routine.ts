@@ -77,6 +77,19 @@ export type VehicleReservation = {
 
 export type FlightStatus = 'not_requested' | 'requested' | 'confirmed'
 
+export type FlightSegment = {
+  id: string
+  direction: 'outbound' | 'return'
+  origin: string
+  destination: string
+  departureDate?: string
+  departureTime?: string
+  arrivalDate?: string
+  arrivalTime?: string
+  airline?: string
+  flightNumber?: string
+}
+
 export type FlightReservation = {
   id: string
   status: FlightStatus
@@ -92,6 +105,7 @@ export type FlightReservation = {
   locator?: string
   outboundFlightNumber?: string
   returnFlightNumber?: string
+  segments: FlightSegment[]
   requestedAt?: string
   notes?: string
 }
@@ -296,6 +310,7 @@ export type SaveFlightInput = {
   locator?: string
   outboundFlightNumber?: string
   returnFlightNumber?: string
+  segments?: FlightSegment[]
   notes?: string
 }
 
