@@ -26,6 +26,12 @@ function requireClient() {
   return supabase
 }
 
+function asArray<T = any>(value: T | T[] | null | undefined): T[] {
+  if (Array.isArray(value)) return value
+  if (value == null) return []
+  return [value]
+}
+
 function mapControlTechIntegrationRequest(row: any): ControlTechIntegrationRequest {
   const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
   return {
@@ -299,10 +305,11 @@ export async function getTrips(workspaceId: string): Promise<Trip[]> {
   if (error) throw error
 
   return (data ?? []).map((row: any) => {
-    const appointments = (row.trip_appointments ?? [])
+    const appointments = asArray<any>(row.trip_appointments)
       .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map((link: any) => {
-        const a = link.appointments
+        const a = Array.isArray(link.appointments) ? link.appointments[0] : link.appointments
+        if (!a) return null
         return {
           id: a.id,
           demandId: a.demand_id ?? undefined,
@@ -317,8 +324,9 @@ export async function getTrips(workspaceId: string): Promise<Trip[]> {
           responsible: a.responsible_user_id || undefined,
         }
       })
+      .filter(Boolean) as Appointment[]
 
-    const lodgings = (row.lodging_reservations ?? []).map((r: any) => ({
+    const lodgings = asArray<any>(row.lodging_reservations).map((r: any) => ({
       id: r.id,
       hotelId: r.hotel_id || undefined,
       name: r.hotels?.name || undefined,
@@ -336,7 +344,7 @@ export async function getTrips(workspaceId: string): Promise<Trip[]> {
       notes: r.notes || undefined,
     }))
 
-    const vehicles = (row.vehicle_reservations ?? []).map((v: any) => ({
+    const vehicles = asArray<any>(row.vehicle_reservations).map((v: any) => ({
       id: v.id,
       status: v.status,
       company: v.rental_company || undefined,
@@ -348,7 +356,7 @@ export async function getTrips(workspaceId: string): Promise<Trip[]> {
       notes: v.notes || undefined,
     }))
 
-    const flights = (row.flight_reservations ?? []).map((f: any) => ({
+    const flights = asArray<any>(row.flight_reservations).map((f: any) => ({
       id: f.id,
       status: f.status,
       outboundOrigin: f.outbound_origin || undefined,
