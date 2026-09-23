@@ -212,7 +212,8 @@ export function TripsPage(){
     <CreateTripModal open={createOpen} onClose={()=>setCreateOpen(false)}/>
   </>
 
-  const lodging = selected.lodgings[0]
+  const lodgingCount = selected.lodgings.length
+  const lodgingHeading = lodgingCount ? `${lodgingCount} hospedagem${lodgingCount === 1 ? '' : 's'} cadastrada${lodgingCount === 1 ? '' : 's'}` : 'Hotel pendente'
   const vehicle = selected.vehicles[0]
   const flight = selected.flights[0]
   const hotelReady = isHotelReady(selected)
@@ -260,19 +261,22 @@ export function TripsPage(){
         </article>
 
         {selected.hotelRequired&&<article id="trip-hotel-card" className={`trip-work-card lodging-card ${hotelReady?'is-ready':'needs-action'}`}>
-          <div className="trip-work-card-head"><span className={`trip-card-icon ${hotelReady?'neutral':'warn'}`}><HotelIcon/></span><div><span className="section-label">Hospedagem</span><h3>{selected.hotelRequired ? selected.lodgings.length ? 'Hospedagem cadastrada' : 'Hotel pendente' : 'Não necessária'}</h3></div>{hotelReady&&<span className="ready-pill"><CheckIcon/> Organizado</span>}</div>
+          <div className="trip-work-card-head"><span className={`trip-card-icon ${hotelReady?'neutral':'warn'}`}><HotelIcon/></span><div><span className="section-label">Hospedagem</span><h3>{lodgingHeading}</h3></div>{hotelReady&&<span className="ready-pill"><CheckIcon/> Organizado</span>}</div>
           <div className="trip-work-card-body">
-            {selected.hotelRequired ? selected.lodgings.length ? selected.lodgings.map((stay,index)=>{
+            {selected.hotelRequired ? selected.lodgings.length ? <>
+              {selected.lodgings.map((stay,index)=>{
               const nights=Math.max(0,differenceInCalendarDays(parseISO(stay.checkOut),parseISO(stay.checkIn)))
               const estimated=stay.pricingMode==='daily'&&stay.dailyValue!=null?nights*stay.dailyValue:stay.totalValue
               return <div className="lodging-item lodging-item-v14" key={stay.id}>
-                <div className="lodging-item-head"><div><h4>{stay.name || `Hotel ${index+1}`}</h4><p><LocationIcon/> {stay.city ? `${stay.city}${stay.state?`/${stay.state}`:''}`:'Cidade não informada'} <span>•</span> {formatDateRange(stay.checkIn,stay.checkOut)} <span>•</span> {nights} {nights===1?'noite':'noites'}</p></div><button className="icon-action-button" title="Editar hospedagem" onClick={()=>{setEditingLodging(stay);setLodgingTrip(selected)}}><EditIcon/></button></div>
+                <div className="lodging-item-head"><div><span className="lodging-sequence">Hotel {index+1}</span><h4>{stay.name || `Hotel ${index+1}`}</h4><p><LocationIcon/> {stay.city ? `${stay.city}${stay.state?`/${stay.state}`:''}`:'Cidade não informada'} <span>•</span> {formatDateRange(stay.checkIn,stay.checkOut)} <span>•</span> {nights} {nights===1?'noite':'noites'}</p></div><button className="icon-action-button" title="Editar hospedagem" onClick={()=>{setEditingLodging(stay);setLodgingTrip(selected)}}><EditIcon/></button></div>
                 <div className="lodging-stat-grid"><span><small>Status</small><strong>{stay.confirmed?'Confirmada':'Aguardando confirmação'}</strong></span><span><small>Valor</small><strong>{estimated!=null?formatMoney(estimated):'Não informado'}</strong></span>{stay.reservationCode&&<span><small>Reserva</small><strong>{stay.reservationCode}</strong></span>}</div>
                 {stay.address&&<div className="location-actions compact-links"><a className="text-link" target="_blank" rel="noreferrer" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stay.address)}`}><LocationIcon/> Maps</a><a className="text-link" target="_blank" rel="noreferrer" href={`https://www.waze.com/ul?q=${encodeURIComponent(stay.address)}&navigate=yes`}><LocationIcon/> Waze</a></div>}
               </div>
-            }) : <p className="trip-empty-copy">Cadastre hotel, período, endereço e valor da reserva.</p> : <p className="trip-empty-copy">Esta viagem foi marcada sem necessidade de hospedagem.</p>}
+              })}
+              <p className="multi-lodging-hint">Use “Adicionar outro hotel” quando trocar de cidade ou hospedagem durante a mesma viagem.</p>
+            </> : <p className="trip-empty-copy">Cadastre hotel, período, endereço e valor da reserva. Você pode adicionar mais de um hotel na mesma viagem.</p> : <p className="trip-empty-copy">Esta viagem foi marcada sem necessidade de hospedagem.</p>}
           </div>
-          {selected.hotelRequired&&<div className="trip-work-card-actions"><button className={selected.lodgings.length?'secondary compact no-margin':'primary compact no-margin'} onClick={()=>{setEditingLodging(null);setLodgingTrip(selected)}}><HotelIcon/> {selected.lodgings.length?'Adicionar hospedagem':'Cadastrar hospedagem'}</button></div>}
+          {selected.hotelRequired&&<div className="trip-work-card-actions"><button className={lodgingCount?'secondary compact no-margin':'primary compact no-margin'} onClick={()=>{setEditingLodging(null);setLodgingTrip(selected)}}><HotelIcon/> {lodgingCount?'Adicionar outro hotel':'Cadastrar hospedagem'}</button></div>}
         </article>}
 
         {selected.vehicleRequired&&<article id="trip-vehicle-card" className={`trip-work-card vehicle-card ${vehicleReady?'is-ready':'needs-action'}`}>

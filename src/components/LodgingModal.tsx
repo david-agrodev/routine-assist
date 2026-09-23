@@ -49,6 +49,10 @@ export function LodgingModal({ trip, lodging, onClose }: { trip: Trip|null; lodg
     setName(h.name); setAddress(h.address||''); setCity(h.city||''); setState(h.state||''); setPhone(h.phone||'')
   }
 
+  const isAdditionalLodging = !lodging && trip.lodgings.length > 0
+  const modalTitle = lodging ? 'Editar hospedagem' : isAdditionalLodging ? 'Adicionar outro hotel' : 'Cadastrar hospedagem'
+  const saveLabel = lodging ? 'Salvar alterações' : isAdditionalLodging ? 'Adicionar hotel' : 'Salvar hospedagem'
+
   const save=async()=>{
     if(!name.trim()||!checkIn||!checkOut||busy)return
     if(checkOut<checkIn){setError('O check-out não pode ser anterior ao check-in.');return}
@@ -78,7 +82,7 @@ export function LodgingModal({ trip, lodging, onClose }: { trip: Trip|null; lodg
   }
 
   return <div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&!busy&&onClose()}><section className="modal-card lodging-modal-card lodging-modal-v14">
-    <div className="modal-head"><div><span className="eyebrow">Hospedagem</span><h2>{lodging?'Editar hospedagem':'Cadastrar hospedagem'}</h2><p className="modal-head-copy">{tripDisplayTitle(trip)} • {trip.start.split('-').reverse().join('/')} → {trip.end.split('-').reverse().join('/')}</p></div><button className="close" onClick={onClose}>×</button></div>
+    <div className="modal-head"><div><span className="eyebrow">Hospedagem</span><h2>{modalTitle}</h2><p className="modal-head-copy">{tripDisplayTitle(trip)} • {trip.start.split('-').reverse().join('/')} → {trip.end.split('-').reverse().join('/')}</p></div><button className="close" onClick={onClose}>×</button></div>
 
     <div className="lodging-form-section">
       <div className="lodging-section-title"><span className="section-icon neutral"><BuildingIcon/></span><div><strong>Hotel e localização</strong><small>Escolha um hotel salvo ou informe os dados da hospedagem.</small></div></div>
@@ -111,6 +115,6 @@ export function LodgingModal({ trip, lodging, onClose }: { trip: Trip|null; lodg
     <div className="lodging-cost-preview lodging-cost-preview-v14"><div><span>{nights} {nights===1?'noite':'noites'}</span><strong>{estimatedTotal>0?formatMoney(estimatedTotal):'Valor ainda não informado'}</strong></div>{address&&<a target="_blank" rel="noreferrer" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}><LocationIcon/> Abrir no Maps</a>}</div>
 
     {error&&<div className="auth-message error modal-error">{error}</div>}
-    <div className="modal-actions lodging-modal-actions"><button className="ghost" onClick={onClose}>Fechar</button><button className="primary" disabled={!name.trim()||busy} onClick={()=>void save()}><HotelIcon/> {busy?'Salvando...':lodging?'Salvar alterações':'Salvar hospedagem'}</button></div>
+    <div className="modal-actions lodging-modal-actions"><button className="ghost" onClick={onClose}>Fechar</button><button className="primary" disabled={!name.trim()||busy} onClick={()=>void save()}><HotelIcon/> {busy?'Salvando...':saveLabel}</button></div>
   </section></div>
 }
