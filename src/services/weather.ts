@@ -43,6 +43,35 @@ export type TripWeatherSummary = {
 }
 
 const cache = new Map<string, Promise<WeatherData>>()
+const BR_STATES: Record<string, string> = {
+  AC: 'Acre',
+  AL: 'Alagoas',
+  AP: 'Amapá',
+  AM: 'Amazonas',
+  BA: 'Bahia',
+  CE: 'Ceará',
+  DF: 'Distrito Federal',
+  ES: 'Espírito Santo',
+  GO: 'Goiás',
+  MA: 'Maranhão',
+  MT: 'Mato Grosso',
+  MS: 'Mato Grosso do Sul',
+  MG: 'Minas Gerais',
+  PA: 'Pará',
+  PB: 'Paraíba',
+  PR: 'Paraná',
+  PE: 'Pernambuco',
+  PI: 'Piauí',
+  RJ: 'Rio de Janeiro',
+  RN: 'Rio Grande do Norte',
+  RS: 'Rio Grande do Sul',
+  RO: 'Rondônia',
+  RR: 'Roraima',
+  SC: 'Santa Catarina',
+  SP: 'São Paulo',
+  SE: 'Sergipe',
+  TO: 'Tocantins',
+}
 
 export function cityLabel(result: GeoResult) {
   return [result.name, result.admin1, result.country_code].filter(Boolean).join(' / ')
@@ -75,7 +104,7 @@ export function buildWeatherSummary(data: WeatherData) {
 }
 
 export async function fetchWeather(city: string, signal?: AbortSignal): Promise<WeatherData> {
-  const key = city.trim().toLocaleLowerCase('pt-BR')
+  const key = city.trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR')
   if (!signal && cache.has(key)) return cache.get(key)!
 
   const request = loadWeather(city, signal)
@@ -84,11 +113,7 @@ export async function fetchWeather(city: string, signal?: AbortSignal): Promise<
 }
 
 async function loadWeather(city: string, signal?: AbortSignal): Promise<WeatherData> {
-  const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=pt&format=json`
-  const geoResponse = await fetch(geoUrl, { signal })
-  if (!geoResponse.ok) throw new Error('Não foi possível buscar a cidade.')
-  const geoJson = await geoResponse.json()
-  const place = geoJson.results?.[0] as GeoResult | undefined
+  const place = await findGeoPlace(city, signal)
   if (!place) throw new Error('Cidade não encontrada. Tente informar cidade e UF.')
 
   const params = new URLSearchParams({
@@ -127,10 +152,53 @@ async function loadWeather(city: string, signal?: AbortSignal): Promise<WeatherD
   }
 }
 
+function normalizeCityInput(value: string) {
+  return value.trim().replace(/\s*\/\s*/g, ' ').replace(/\s*,\s*/g, ' ').replace(/\s+/g, ' ')
+}
+
+function stripDiacritics(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+function parseCityAndState(value: string) {
+  const normalized = normalizeCityInput(value)
+  const match = normalized.match(/^(.*)\s([A-Z]{2})$/i)
+  const state = match?.[2]?.toUpperCase()
+  if (match && state && BR_STATES[state]) return { city: match[1].trim(), state }
+  return { city: normalized, state: '' }
+}
+
+async function findGeoPlace(city: string, signal?: AbortSignal): Promise<GeoResult | undefined> {
+  const parsed = parseCityAndState(city)
+  const queries = [parsed.city, stripDiacritics(parsed.city), normalizeCityInput(city), stripDiacritics(normalizeCityInput(city))]
+    .map(query => query.trim())
+    .filter((query, index, list) => query && list.indexOf(query) === index)
+
+  for (const query of queries) {
+    const params = new URLSearchParams({ name: query, count: '5', language: 'pt', format: 'json' })
+    if (parsed.state) params.set('countryCode', 'BR')
+    const geoResponse = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params.toString()}`, { signal })
+    if (!geoResponse.ok) throw new Error('Não foi possível buscar a cidade.')
+    const geoJson = await geoResponse.json()
+    const results = (geoJson.results ?? []) as GeoResult[]
+    if (!results.length) continue
+
+    if (parsed.state) {
+      const expectedState = BR_STATES[parsed.state]
+      const stateMatch = results.find(result => result.country_code === 'BR' && result.admin1 === expectedState)
+      if (stateMatch) return stateMatch
+      const brazilMatch = results.find(result => result.country_code === 'BR')
+      if (brazilMatch) return brazilMatch
+    }
+
+    return results[0]
+  }
+}
+
 export function tripWeatherCity(trip: Trip) {
   const appointment = trip.appointments.find(item => item.city)
   if (!appointment?.city) return ''
-  return [appointment.city, appointment.state].filter(Boolean).join(' ')
+  return [appointment.city, appointment.state].filter(Boolean).join(', ')
 }
 
 export function summarizeTripWeather(trip: Trip, data: WeatherData): TripWeatherSummary | null {
