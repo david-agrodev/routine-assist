@@ -1,4 +1,4 @@
-import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from 'date-fns'
+import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isAfter, isBefore, parseISO, startOfMonth, startOfWeek } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -7,8 +7,10 @@ import { MobileAgenda } from '../components/MobileAgenda'
 import { MonthCalendar } from '../components/MonthCalendar'
 import { AgendaSummaryModal } from '../components/AgendaSummaryModal'
 import { DemandDetailModal } from '../components/DemandDetailModal'
-import { AlertIcon, CalendarIcon, RouteIcon } from '../components/Icons'
+import { AlertIcon, CalendarIcon, CheckIcon, RouteIcon } from '../components/Icons'
+import { tripReadinessStatus } from '../components/CalendarTripVisuals'
 import { useRoutine } from '../context/RoutineContext'
+import { tripCompanyKeys } from '../lib/company'
 import { getBrazilHolidaysForYears } from '../services/holidays'
 import type { Demand, Holiday, Trip } from '../types/routine'
 
@@ -45,6 +47,14 @@ export function CalendarPage(){
     return holidays.filter(h=>h.date>=start&&h.date<=end).length
   },[holidays,periodStart,periodEnd])
 
+  const periodTrips=useMemo(()=>trips.filter(trip=>!isBefore(parseISO(trip.end),periodStart)&&!isAfter(parseISO(trip.start),periodEnd)),[trips,periodStart,periodEnd])
+  const periodTripStats=useMemo(()=>({
+    total: periodTrips.length,
+    alta: periodTrips.filter(trip=>tripCompanyKeys(trip,demands).includes('alta')).length,
+    genex: periodTrips.filter(trip=>tripCompanyKeys(trip,demands).includes('genex')).length,
+    pending: periodTrips.filter(trip=>tripReadinessStatus(trip).tone!=='ready').length,
+  }),[periodTrips,demands])
+
   const existingConflicts=useMemo(()=>{
     const tripIdsByAppointment=new Map<string,Set<string>>()
     trips.forEach(t=>t.appointments.forEach(a=>{const set=tripIdsByAppointment.get(a.id)||new Set<string>();set.add(t.id);tripIdsByAppointment.set(a.id,set)}))
@@ -78,6 +88,13 @@ export function CalendarPage(){
 
 
     {existingConflicts.length>0 && <div className="legacy-conflict-banner"><AlertIcon/><div><strong>{existingConflicts.length} conflito{existingConflicts.length===1?' antigo':'s antigos'} na agenda</strong><span>Há atendimentos já cadastrados em datas sobrepostas. Novos conflitos estão bloqueados; ajuste os períodos antigos em Demandas.</span></div></div>}
+
+    <section className="calendar-summary-strip" aria-label="Resumo do período">
+      <article><RouteIcon/><div><span>Viagens</span><strong>{periodTripStats.total}</strong></div></article>
+      <article className="company-genex"><i/><div><span>GENEX Brasil</span><strong>{periodTripStats.genex}</strong></div></article>
+      <article className="company-alta"><i/><div><span>ALTA Genetics</span><strong>{periodTripStats.alta}</strong></div></article>
+      <article className={periodTripStats.pending?'pending':'ok'}>{periodTripStats.pending?<AlertIcon/>:<CheckIcon/>}<div><span>Pendências</span><strong>{periodTripStats.pending}</strong></div></article>
+    </section>
 
     <section className="panel calendar-main-panel redesigned-calendar-panel">
       <div className="calendar-toolbar modern-calendar-toolbar">
