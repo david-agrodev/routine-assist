@@ -2,8 +2,7 @@ import { differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns
 import { ptBR } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
 import { AlertIcon, ArrowIcon, CarIcon, CheckIcon, HotelIcon, PlaneIcon, RouteIcon } from '../components/Icons'
-import { WeekCalendar } from '../components/WeekCalendar'
-import { MobileAgenda } from '../components/MobileAgenda'
+import { WeatherPanel } from '../components/WeatherPanel'
 import { useRoutine } from '../context/RoutineContext'
 import { buildPendingItems } from '../lib/pending'
 import { isFlightReady, isHotelReady, isVehicleReady } from '../lib/tripReadiness'
@@ -16,7 +15,7 @@ function greeting(){
 
 export function Dashboard() {
   const navigate = useNavigate()
-  const { demands, trips, appointments, loading, error, notificationPreferences } = useRoutine()
+  const { demands, trips, appointments, error, notificationPreferences } = useRoutine()
   const activeTrips = trips.filter(t=>t.status==='planned')
   const pending = buildPendingItems(demands,activeTrips,notificationPreferences)
   const linkedAppointmentIds = new Set(activeTrips.flatMap(t => t.appointments.map(a => a.id)))
@@ -24,7 +23,6 @@ export function Dashboard() {
   const today = startOfDay(new Date())
   const nextTrip = activeTrips.find(t=>parseISO(t.end)>=today) ?? activeTrips[0]
   const activeDemands = demands.filter(d=>!['done','cancelled'].includes(d.status)).length
-  const weekAnchor = nextTrip?.start || standaloneAppointments[0]?.start || new Date()
   const nextDays = nextTrip ? differenceInCalendarDays(parseISO(nextTrip.start),today) : null
   const dateLabel = format(new Date(),"EEEE, d 'de' MMMM",{locale:ptBR})
   const hotelReady = nextTrip ? isHotelReady(nextTrip) : false
@@ -79,6 +77,6 @@ export function Dashboard() {
         </div>
       </section>
     </div>
-    <section className="panel calendar-panel"><div className="panel-head"><div><span className="eyebrow">Agenda</span><h2>Visão da semana</h2></div><a className="text-link" href="/calendario">Abrir calendário <ArrowIcon/></a></div>{loading && appointments.length===0 && activeTrips.length===0 ? <div className="empty-inline">Carregando agenda...</div> : <><div className="desktop-calendar"><WeekCalendar compact trips={activeTrips} appointments={standaloneAppointments} demands={demands} weekStart={weekAnchor}/></div><div className="mobile-calendar"><MobileAgenda compact trips={activeTrips} appointments={standaloneAppointments} demands={demands} weekStart={weekAnchor}/></div></>}</section>
+    <WeatherPanel/>
   </>
 }
