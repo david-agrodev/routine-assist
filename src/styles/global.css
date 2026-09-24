@@ -515,11 +515,16 @@
 @media(max-width:720px){.bottom-nav{grid-template-columns:repeat(3,minmax(0,1fr))}.main{padding-bottom:126px}.mobile-fab{bottom:126px}.bottom-item span{line-height:1.1;white-space:normal}.control-tech-heading .secondary{width:100%;justify-content:center}}
 @media(max-width:560px){.integration-metrics,.integration-row,.integration-detail-grid,.integration-history-grid{grid-template-columns:1fr}.integration-detail-modal{width:calc(100vw - 16px);max-height:calc(100vh - 16px)}}
 
+/* Mantém a referência dos dias visível enquanto o calendário mensal rola. */
+.redesigned-calendar-panel{overflow:visible}
+.redesigned-calendar-panel .month-head{position:sticky;top:76px;z-index:8;background:#fff;box-shadow:0 8px 14px rgba(56,43,33,.08)}
+
 /* Modais de logística precisam ficar acima do detalhe da viagem aberto. */
 .trip-detail-backdrop ~ .modal-backdrop{z-index:110}
 
 /* Mobile navigation - compact primary menu */
 @media(max-width:720px){
+  .redesigned-calendar-panel .month-head{top:calc(64px + env(safe-area-inset-top))}
   .bottom-nav{grid-template-columns:repeat(5,minmax(0,1fr));z-index:45}
   .bottom-more-trigger{border:0;background:transparent}
   .bottom-more-scrim{position:fixed;inset:0;border:0;background:rgba(45,45,43,.18);z-index:42}
