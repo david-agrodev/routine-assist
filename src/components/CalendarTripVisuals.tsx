@@ -11,6 +11,15 @@ export function tripDone(trip: Trip, demands: Demand[]) {
 }
 
 export function tripReadinessStatus(trip: Trip) {
+  if (trip.status === 'completed') {
+    return { label: 'Viagem concluída', tone: 'completed' as const, detail: 'Esta viagem está no histórico', icon: <CheckIcon/> }
+  }
+
+  const today = new Date().toISOString().slice(0, 10)
+  if (trip.end < today) {
+    return { label: 'Aguardando conclusão', tone: 'warn' as const, detail: 'A viagem já passou e ainda não foi concluída', icon: <AlertIcon/> }
+  }
+
   const missing: string[] = []
   if (trip.hotelRequired && !isHotelReady(trip)) missing.push('Hospedagem')
   if (trip.vehicleRequired && !isVehicleReady(trip)) missing.push('Veículo')
