@@ -525,6 +525,13 @@
 /* Mobile navigation - compact primary menu */
 @media(max-width:720px){
   .redesigned-calendar-panel .month-head{top:calc(64px + env(safe-area-inset-top))}
+  .mobile-month-fallback{padding-bottom:96px}
+  .month-calendar-mobile .month-event.trip,.month-calendar-mobile .month-event.appointment{justify-content:flex-start;gap:5px;padding:9px 10px;min-height:112px;line-height:1.25}
+  .month-calendar-mobile .month-event-main{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:5px;min-height:27px}
+  .month-calendar-mobile .month-event-main strong{grid-column:2/-1;font-size:10px;white-space:normal;line-height:1.2}
+  .month-calendar-mobile .month-event-main .calendar-logistics-icons{grid-column:3;grid-row:1;align-self:start}
+  .month-calendar-mobile .month-event small{font-size:8px;white-space:normal;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .month-calendar-mobile .month-event-aux{margin-top:auto}
   .bottom-nav{grid-template-columns:repeat(5,minmax(0,1fr));z-index:45}
   .bottom-more-trigger{border:0;background:transparent}
   .bottom-more-scrim{position:fixed;inset:0;border:0;background:rgba(45,45,43,.18);z-index:42}

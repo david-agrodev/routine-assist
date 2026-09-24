@@ -20,21 +20,21 @@ function clipPosition(start:string,end:string,weekStart:Date){
 const demandForAppointment = (appointment: Appointment, demands: Demand[]) => appointment.demandId ? demands.find(d => d.id === appointment.demandId) : undefined
 const appointmentDone = (appointment: Appointment, demands: Demand[]) => demandForAppointment(appointment, demands)?.status === 'done'
 const appointmentRemote = (appointment: Appointment) => appointment.type === 'Remoto'
-export function MonthCalendar({ month, trips, appointments, demands=[], holidays=[], onDaySelect }:{month:Date;trips:Trip[];appointments:Appointment[];demands?:Demand[];holidays?:Holiday[];onDaySelect?:(day:Date)=>void}){
+export function MonthCalendar({ month, trips, appointments, demands=[], holidays=[], onDaySelect, mobile=false }:{month:Date;trips:Trip[];appointments:Appointment[];demands?:Demand[];holidays?:Holiday[];onDaySelect?:(day:Date)=>void;mobile?:boolean}){
   const gridStart=startOfWeek(startOfMonth(month),{weekStartsOn:1})
   const gridEnd=endOfWeek(endOfMonth(month),{weekStartsOn:1})
   const weeks:Date[]=[]
   for(let d=gridStart;!isAfter(d,gridEnd);d=addWeeks(d,1))weeks.push(d)
   const dayNames=['SEG','TER','QUA','QUI','SEX','SÁB','DOM']
 
-  return <div className="month-calendar">
+  return <div className={`month-calendar ${mobile?'month-calendar-mobile':''}`}>
     <div className="month-head">{dayNames.map((d,i)=><span className={i>=5?'weekend':''} key={d}>{d}</span>)}</div>
     {weeks.map((weekStart)=>{
       const weekEnd=endOfWeek(weekStart,{weekStartsOn:1})
       const weekTrips=trips.filter(t=>!isBefore(parseISO(t.end),weekStart)&&!isAfter(parseISO(t.start),weekEnd))
       const weekAppointments=appointments.filter(a=>!isBefore(parseISO(a.end),weekStart)&&!isAfter(parseISO(a.start),weekEnd))
       const rows=Math.max(3,1+weekTrips.length+weekAppointments.length)
-      return <div className="month-week" key={weekStart.toISOString()} style={{gridTemplateRows:`36px repeat(${rows-1},76px)`}}>
+      return <div className="month-week" key={weekStart.toISOString()} style={{gridTemplateRows:`36px repeat(${rows-1},${mobile?'132px':'76px'})`}}>
         {Array.from({length:7},(_,i)=>addDays(weekStart,i)).map(day=>{const holiday=holidayForDate(holidays,day);return <button type="button" className={`month-day month-day-button ${day.getMonth()===month.getMonth()?'':'outside'} ${isWeekend(day)?'weekend':''} ${holiday?'holiday':''}`} key={day.toISOString()} onClick={()=>onDaySelect?.(day)} style={{gridColumn:iFor(day,weekStart),gridRow:1}}><span>{format(day,'d',{locale:ptBR})}</span>{holiday&&<small title={holiday.name}>{holiday.name}</small>}</button>})}
         {Array.from({length:7},(_,i)=>{const day=addDays(weekStart,i);const holiday=holidayForDate(holidays,day);return <button type="button" aria-label="Abrir resumo do dia" className={`month-column month-column-button ${isWeekend(day)?'weekend':''} ${holiday?'holiday':''}`} key={i} onClick={()=>onDaySelect?.(day)} style={{gridColumn:i+1,gridRow:`1 / ${rows+1}`}}/>}) }
         {weekTrips.map((t,i)=>{const key=tripCompanyKey(t,demands); const commercial=compactTripCommercials(t,demands,2); const done=tripDone(t,demands); const status=tripReadinessStatus(t); return <button type="button" className={`month-event trip month-event-button ${companyClass(key)} ${done?'calendar-event-done':''}`} key={t.id} onClick={()=>onDaySelect?.(isBefore(parseISO(t.start),weekStart)?weekStart:parseISO(t.start))} style={{gridColumn:clipPosition(t.start,t.end,weekStart),gridRow:i+2}}><span className="month-event-main"><b>{companyLabel(key)}</b><TripWeatherChip trip={t}/><strong>{compactTripStops(t,2)}</strong><TripLogisticsIcons trip={t} done={done}/></span><small className="month-event-detail"><span>{compactTripClients(t,2)}</span>{commercial&&<span>Comercial: {commercial}</span>}</small>{status.tone!=='ready'&&<span className="month-event-aux"><TripStatusBadge trip={t}/></span>}</button>})}

@@ -115,7 +115,7 @@ export function CalendarPage(){
         <div className="calendar-toolbar-right"><button className="today-button" onClick={()=>setAnchor(new Date())}>Hoje</button><button aria-label="Próximo período" onClick={next}>›</button></div>
       </div>
       {mode==='month' && <div className="desktop-month-calendar"><MonthCalendar month={month} trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} onDaySelect={setSummaryDate}/></div>}
-      {mode==='month' && <div className="mobile-month-fallback"><MonthCalendar month={month} trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} onDaySelect={setSummaryDate}/></div>}
+      {mode==='month' && <div className="mobile-month-fallback"><MonthCalendar month={month} trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} onDaySelect={setSummaryDate} mobile/></div>}
       {mode==='week' && <div className="desktop-calendar"><WeekCalendar trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate}/></div>}
       {mode==='week' && <div className="mobile-calendar"><MobileAgenda trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate}/></div>}
       {mode==='agenda' && <MobileAgenda trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate}/>}
