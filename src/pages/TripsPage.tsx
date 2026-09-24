@@ -113,14 +113,21 @@ export function TripsPage(){
   const selectTrip=(trip:Trip)=>{
     setSelectedId(trip.id)
     setSearchParams({trip:trip.id})
-    window.requestAnimationFrame(()=>document.getElementById('trip-selected-detail')?.scrollIntoView({behavior:'smooth',block:'start'}))
   }
 
   const closeSelected=()=>{
     setSelectedId(null)
     setSearchParams({})
-    window.requestAnimationFrame(()=>document.getElementById('trip-browser')?.scrollIntoView({behavior:'smooth',block:'start'}))
   }
+
+  useEffect(()=>{
+    if (!selectedId) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeSelected()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  },[selectedId])
 
   const pageHeader=<section className="page-heading trips-page-heading"><div><span className="eyebrow">Logística</span><h1>Viagens</h1><p>Próximas viagens ficam separadas das que estão em andamento e das já concluídas.</p></div><div className="page-heading-actions"><button className="primary" onClick={()=>setCreateOpen(true)}><PlusIcon/> Nova viagem</button></div></section>
 
@@ -193,6 +200,7 @@ export function TripsPage(){
       const overdue=t.status==='planned'&&t.end<todayIso
       return <button type="button" key={t.id} className={`trip-browser-card ${t.id===selected?.id?'active':''} ${companyClass(key)}`} onClick={()=>selectTrip(t)}>
         <span className="trip-browser-accent" aria-hidden="true"/>
+        <span className={`trip-browser-hero-icon ${t.status==='completed'?'completed':overdue?'overdue':t.start<=todayIso?'ongoing':'upcoming'}`} aria-hidden="true">{t.status==='completed'?<CheckIcon/>:overdue?<AlertIconProxy/>:t.start<=todayIso?<CompassIcon/>:<RouteIcon/>}</span>
         <div className="trip-browser-card-top"><span className="company-badge">{companyLabel(key)}</span><span>{formatDateRange(t.start,t.end)}</span></div><div className={`trip-lifecycle-badge ${t.status==='completed'?'completed':overdue?'overdue':t.start<=todayIso?'ongoing':'upcoming'}`}>{t.status==='completed'?'Concluída':overdue?'Aguardando conclusão':t.start<=todayIso?'Em andamento':'Programada'}</div>
         <strong>{tripDisplayTitle(t)}</strong>
         <small><LocationIcon/> {compactTripStops(t,2)}</small>
@@ -237,7 +245,8 @@ export function TripsPage(){
     {tripTabs}
     {browser}
 
-    <section id="trip-selected-detail" className={`trip-selected-shell ${companyClass(companyKey)}`}>
+    <div className="modal-backdrop trip-detail-backdrop" onMouseDown={event=>event.target===event.currentTarget&&closeSelected()}>
+    <section id="trip-selected-detail" className={`trip-selected-shell trip-detail-modal ${companyClass(companyKey)}`} onMouseDown={event=>event.stopPropagation()}>
       <header className="trip-selected-header">
         <div className="trip-selected-heading">
           <div className="company-title-row"><span className="company-badge">{companyLabel(companyKey)}</span><span className="eyebrow">{selected.status==='completed'?'Histórico':'Viagem aberta'}</span></div>
@@ -246,7 +255,7 @@ export function TripsPage(){
         </div>
         <div className="trip-selected-actions">
           <div className="trip-readiness-card"><span>Preparação</span><strong>{readiness}%</strong><i><b style={{width:`${readiness}%`}}/></i><small>{readinessDone}/{readinessChecks.length} etapas prontas</small></div>
-          <div className="trip-action-row">{selected.status==='planned'&&<><button className="secondary mini" onClick={()=>setEditTrip(selected)}><EditIcon/> Editar</button><button className={selected.end<=todayIso?'primary mini':'secondary mini complete-trip-button'} onClick={()=>{setCompleteError(null);setCompleteOpen(true)}}><CheckIcon/> Concluir viagem</button></>}<button className="secondary mini" onClick={closeSelected}>Fechar detalhes</button><button className="danger-outline mini" disabled={deleting} onClick={()=>{setDeleteError(null);setDeleteOpen(true)}}><TrashIcon/> Excluir</button></div>
+          <div className="trip-action-row">{selected.status==='planned'&&<><button className="secondary mini" onClick={()=>setEditTrip(selected)}><EditIcon/> Editar</button><button className={selected.end<=todayIso?'primary mini':'secondary mini complete-trip-button'} onClick={()=>{setCompleteError(null);setCompleteOpen(true)}}><CheckIcon/> Concluir viagem</button></>}<button className="secondary mini" onClick={closeSelected}>Fechar</button><button className="danger-outline mini" disabled={deleting} onClick={()=>{setDeleteError(null);setDeleteOpen(true)}}><TrashIcon/> Excluir</button></div>
         </div>
       </header>
       {selected.status==='completed'&&<div className="trip-completed-banner"><CheckIcon/><div><strong>Viagem concluída</strong><span>{selected.completedAt ? `Concluída em ${new Date(selected.completedAt).toLocaleDateString('pt-BR')}` : 'Esta viagem está arquivada no histórico.'}</span></div></div>}
@@ -312,6 +321,7 @@ export function TripsPage(){
 
       <footer className="trip-status-strip"><span className={selected.appointments.length?'ok':'pending'}><CheckIcon/> {selected.appointments.length?'Atendimentos vinculados':'Atendimentos pendentes'}</span>{selected.hotelRequired&&<span className={hotelReady?'ok':'pending'}><HotelIcon/> {hotelReady?'Hotel organizado':'Hotel pendente'}</span>}{selected.vehicleRequired&&<span className={vehicleReady?'ok':'pending'}><CarIcon/> {vehicleReady?'Veículo organizado':'Veículo pendente'}</span>}{selected.flightRequired&&<span className={flightReady?'ok':'pending'}><PlaneIcon/> {flightReady?'Passagem organizada':'Passagem pendente'}</span>}</footer>
     </section>
+    </div>
 
     <CreateTripModal open={createOpen} onClose={()=>setCreateOpen(false)}/>
     <EditTripModal trip={editTrip} onClose={()=>setEditTrip(null)}/>
@@ -360,4 +370,8 @@ function formatRouteDuration(minutes:number){ const h=Math.floor(minutes/60); co
 
 function CalendarIconProxy(){
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" rx="2.5"/><path d="M8 3.8v3.4M16 3.8v3.4M4 9.3h16"/><path d="M8 13h3M8 16h5"/></svg>
+}
+
+function AlertIconProxy(){
+  return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m12 4 8 15H4L12 4Z"/><path d="M12 9v4M12 17h.01"/></svg>
 }
