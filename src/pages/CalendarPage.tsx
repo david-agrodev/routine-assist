@@ -18,7 +18,6 @@ type ViewMode='month'|'week'|'agenda'
 
 export function CalendarPage(){
   const { trips, appointments, demands } = useRoutine()
-  const calendarTrips = useMemo(()=>trips.filter(trip => trip.status !== 'completed'),[trips])
   const linkedAppointments = useMemo(()=>{
     const ids = new Set<string>()
     const demandIds = new Set<string>()
@@ -60,7 +59,7 @@ export function CalendarPage(){
     return holidays.filter(h=>h.date>=start&&h.date<=end).length
   },[holidays,periodStart,periodEnd])
 
-  const periodTrips=useMemo(()=>calendarTrips.filter(trip=>!isBefore(parseISO(trip.end),periodStart)&&!isAfter(parseISO(trip.start),periodEnd)),[calendarTrips,periodStart,periodEnd])
+  const periodTrips=useMemo(()=>trips.filter(trip=>!isBefore(parseISO(trip.end),periodStart)&&!isAfter(parseISO(trip.start),periodEnd)),[trips,periodStart,periodEnd])
   const periodTripStats=useMemo(()=>({
     total: periodTrips.length,
     alta: periodTrips.filter(trip=>tripCompanyKeys(trip,demands).includes('alta')).length,
@@ -90,7 +89,7 @@ export function CalendarPage(){
   return <>
     <section className="page-heading calendar-page-heading">
       <div><span className="eyebrow">Agenda operacional</span><h1>Calendário</h1><p>Todas as centrais ficam visíveis ao mesmo tempo para evitar conflitos. Viagens aparecem como períodos contínuos e mostram as fazendas vinculadas.</p></div>
-      <div className="calendar-heading-badge"><CalendarIcon/><div><strong>{calendarTrips.length}</strong><span>viagens ativas no calendário</span></div></div>
+      <div className="calendar-heading-badge"><CalendarIcon/><div><strong>{trips.length}</strong><span>viagens no calendário</span></div></div>
     </section>
 
     <section className="calendar-controls panel calendar-controls-no-filter">
@@ -115,15 +114,15 @@ export function CalendarPage(){
         <div className="calendar-period-copy"><span className="eyebrow">Período</span><strong className="calendar-period-label">{label}</strong><small>Finais de semana e feriados são destacados. Toque em uma data para abrir o resumo.</small></div>
         <div className="calendar-toolbar-right"><button className="today-button" onClick={()=>setAnchor(new Date())}>Hoje</button><button aria-label="Próximo período" onClick={next}>›</button></div>
       </div>
-      {mode==='month' && <div className="desktop-month-calendar"><MonthCalendar month={month} trips={calendarTrips} appointments={standaloneAppointments} demands={demands} holidays={holidays} onDaySelect={setSummaryDate}/></div>}
-      {mode==='month' && <div className="mobile-month-fallback"><MonthCalendar month={month} trips={calendarTrips} appointments={standaloneAppointments} demands={demands} holidays={holidays} onDaySelect={setSummaryDate}/></div>}
-      {mode==='week' && <div className="desktop-calendar"><WeekCalendar trips={calendarTrips} appointments={standaloneAppointments} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate}/></div>}
-      {mode==='week' && <div className="mobile-calendar"><MobileAgenda trips={calendarTrips} appointments={standaloneAppointments} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate}/></div>}
-      {mode==='agenda' && <MobileAgenda trips={calendarTrips} appointments={standaloneAppointments} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate}/>}
+      {mode==='month' && <div className="desktop-month-calendar"><MonthCalendar month={month} trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} onDaySelect={setSummaryDate}/></div>}
+      {mode==='month' && <div className="mobile-month-fallback"><MonthCalendar month={month} trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} onDaySelect={setSummaryDate}/></div>}
+      {mode==='week' && <div className="desktop-calendar"><WeekCalendar trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate}/></div>}
+      {mode==='week' && <div className="mobile-calendar"><MobileAgenda trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate}/></div>}
+      {mode==='agenda' && <MobileAgenda trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate}/>}
     </section>
     <div className="calendar-legend modern-calendar-legend"><span><i className="legend company-alta"></i> ALTA</span><span><i className="legend company-genex"></i> GENEX</span><span><i className="legend weekend"></i> Sábado / domingo</span><span><i className="legend holiday"></i> Feriado nacional</span><span><AlertIcon/> Datas ocupadas não podem receber outro atendimento.</span></div>
 
-    <AgendaSummaryModal date={summaryDate} trips={calendarTrips} appointments={standaloneAppointments} demands={demands} holidays={holidays} onClose={()=>setSummaryDate(null)} onOpenDemand={openDemand} onOpenTrip={openTrip}/>
+    <AgendaSummaryModal date={summaryDate} trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} onClose={()=>setSummaryDate(null)} onOpenDemand={openDemand} onOpenTrip={openTrip}/>
     <DemandDetailModal demand={selectedDemand} onClose={()=>setSelectedDemand(null)}/>
   </>
 }

@@ -24,6 +24,7 @@ import { FlightModal } from '../components/FlightModal'
 import { ConfirmActionModal } from '../components/ConfirmActionModal'
 import { EditTripModal } from '../components/EditTripModal'
 import { DemandDetailModal } from '../components/DemandDetailModal'
+import { TripWeatherCard } from '../components/TripWeather'
 import { useRoutine } from '../context/RoutineContext'
 import { VEHICLE_FORM_URL } from '../lib/constants'
 import { formatDateRange, formatMoney } from '../lib/format'
@@ -250,6 +251,7 @@ export function TripsPage(){
       </header>
       {selected.status==='completed'&&<div className="trip-completed-banner"><CheckIcon/><div><strong>Viagem concluída</strong><span>{selected.completedAt ? `Concluída em ${new Date(selected.completedAt).toLocaleDateString('pt-BR')}` : 'Esta viagem está arquivada no histórico.'}</span></div></div>}
       {logisticsItems.length>0&&<div className="trip-logistics-summary"><span className="section-label">Logística necessária</span><div>{logisticsItems.map(item=><span key={item.key} className={`logistics-chip ${item.ready?'ready':'pending'}`}>{item.icon}<strong>{item.label}</strong><small>{item.text}</small></span>)}</div></div>}
+      <TripWeatherCard trip={selected}/>
 
       <div className="trip-workspace-grid">
         <article className="trip-work-card appointments-card">
