@@ -214,10 +214,6 @@ export function TripsPage(){
     {pageHeader}
     {tripTabs}
     {browser}
-    <section className="panel trip-no-selection">
-      <div className="trip-no-selection-icon"><CompassIcon/></div>
-      <div><span className="eyebrow">Nenhuma viagem aberta</span><h2>Selecione uma viagem acima</h2><p>Os detalhes só aparecem depois da sua escolha. Isso evita confundir uma viagem antiga com a que você realmente quer consultar.</p></div>
-    </section>
     <CreateTripModal open={createOpen} onClose={()=>setCreateOpen(false)}/>
   </>
 
@@ -247,6 +243,7 @@ export function TripsPage(){
 
     <div className="modal-backdrop trip-detail-backdrop" onMouseDown={event=>event.target===event.currentTarget&&closeSelected()}>
     <section id="trip-selected-detail" className={`trip-selected-shell trip-detail-modal ${companyClass(companyKey)}`} onMouseDown={event=>event.stopPropagation()}>
+      <button type="button" className="close trip-modal-close" aria-label="Fechar detalhes da viagem" onClick={closeSelected}>×</button>
       <header className="trip-selected-header">
         <div className="trip-selected-heading">
           <div className="company-title-row"><span className="company-badge">{companyLabel(companyKey)}</span><span className="eyebrow">{selected.status==='completed'?'Histórico':'Viagem aberta'}</span></div>
@@ -255,7 +252,7 @@ export function TripsPage(){
         </div>
         <div className="trip-selected-actions">
           <div className="trip-readiness-card"><span>Preparação</span><strong>{readiness}%</strong><i><b style={{width:`${readiness}%`}}/></i><small>{readinessDone}/{readinessChecks.length} etapas prontas</small></div>
-          <div className="trip-action-row">{selected.status==='planned'&&<><button className="secondary mini" onClick={()=>setEditTrip(selected)}><EditIcon/> Editar</button><button className={selected.end<=todayIso?'primary mini':'secondary mini complete-trip-button'} onClick={()=>{setCompleteError(null);setCompleteOpen(true)}}><CheckIcon/> Concluir viagem</button></>}<button className="secondary mini" onClick={closeSelected}>Fechar</button><button className="danger-outline mini" disabled={deleting} onClick={()=>{setDeleteError(null);setDeleteOpen(true)}}><TrashIcon/> Excluir</button></div>
+          <div className="trip-action-row">{selected.status==='planned'&&<><button className="secondary mini" onClick={()=>setEditTrip(selected)}><EditIcon/> Editar</button><button className={selected.end<=todayIso?'primary mini':'secondary mini complete-trip-button'} onClick={()=>{setCompleteError(null);setCompleteOpen(true)}}><CheckIcon/> Concluir viagem</button></>}<button className="danger-outline mini" disabled={deleting} onClick={()=>{setDeleteError(null);setDeleteOpen(true)}}><TrashIcon/> Excluir</button></div>
         </div>
       </header>
       {selected.status==='completed'&&<div className="trip-completed-banner"><CheckIcon/><div><strong>Viagem concluída</strong><span>{selected.completedAt ? `Concluída em ${new Date(selected.completedAt).toLocaleDateString('pt-BR')}` : 'Esta viagem está arquivada no histórico.'}</span></div></div>}
