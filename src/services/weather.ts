@@ -18,11 +18,23 @@ export type WeatherDay = {
 
 export type WeatherData = {
   city: string
+  source: string
+  fetchedAt: string
+  timezone: string
+  station?: {
+    icao: string
+    name: string
+    distanceKm: number
+  }
   current: {
     temperature: number
+    apparentTemperature: number
     humidity: number
     wind: number
     code: number
+    rainChance: number
+    precipitation: number
+    observedAt: string
   }
   today: {
     min: number
@@ -42,7 +54,25 @@ export type TripWeatherSummary = {
   rainChance: number
 }
 
-const cache = new Map<string, Promise<WeatherData>>()
+type WeatherCacheEntry = {
+  expiresAt: number
+  request: Promise<WeatherData>
+}
+
+type CurrentObservation = {
+  temperature: number
+  humidity: number
+  wind: number
+  observedAt: string
+  station: {
+    icao: string
+    name: string
+    distanceKm: number
+  }
+}
+
+const WEATHER_CACHE_TTL = 15 * 60 * 1000
+const cache = new Map<string, WeatherCacheEntry>()
 const BR_STATES: Record<string, string> = {
   AC: 'Acre',
   AL: 'Alagoas',
@@ -103,30 +133,46 @@ export function buildWeatherSummary(data: WeatherData) {
   return 'Condições climáticas estáveis para acompanhar a agenda.'
 }
 
-export async function fetchWeather(city: string, signal?: AbortSignal): Promise<WeatherData> {
-  const key = city.trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR')
-  if (!signal && cache.has(key)) return cache.get(key)!
+export async function fetchWeather(city: string, signal?: AbortSignal, force = false, includeStationObservation = false): Promise<WeatherData> {
+  const key = `${city.trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR')}:${includeStationObservation ? 'observed' : 'forecast'}`
+  const cached = cache.get(key)
+  if (!force && !signal && cached && cached.expiresAt > Date.now()) return cached.request
 
-  const request = loadWeather(city, signal)
-  if (!signal) cache.set(key, request)
+  const request = loadWeather(city, signal, includeStationObservation)
+  if (!signal) {
+    cache.set(key, { expiresAt: Date.now() + WEATHER_CACHE_TTL, request })
+    request.catch(() => cache.delete(key))
+  }
   return request
 }
 
-async function loadWeather(city: string, signal?: AbortSignal): Promise<WeatherData> {
+export async function fetchWeatherByCoordinates(latitude: number, longitude: number, label: string, signal?: AbortSignal): Promise<WeatherData> {
+  return loadWeatherForPlace({ name: label, latitude, longitude }, signal, true)
+}
+
+async function loadWeather(city: string, signal?: AbortSignal, includeStationObservation = false): Promise<WeatherData> {
   const place = await findGeoPlace(city, signal)
   if (!place) throw new Error('Cidade não encontrada. Tente informar cidade e UF.')
 
+  return loadWeatherForPlace(place, signal, includeStationObservation)
+}
+
+async function loadWeatherForPlace(place: GeoResult, signal?: AbortSignal, includeStationObservation = false): Promise<WeatherData> {
   const params = new URLSearchParams({
     latitude: String(place.latitude),
     longitude: String(place.longitude),
-    current: 'temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m',
+    current: 'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m',
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
     forecast_days: '7',
     timezone: 'auto',
   })
+  const stationRequest = includeStationObservation
+    ? fetchCurrentObservation(place.latitude, place.longitude, signal)
+    : Promise.resolve(null)
   const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, { signal })
   if (!weatherResponse.ok) throw new Error('Não foi possível carregar a previsão.')
   const json = await weatherResponse.json()
+  const observation = await stationRequest
   const daily = (json.daily?.time ?? []).map((date: string, index: number) => ({
     date,
     code: json.daily.weather_code?.[index] ?? 0,
@@ -135,13 +181,25 @@ async function loadWeather(city: string, signal?: AbortSignal): Promise<WeatherD
     rainChance: json.daily.precipitation_probability_max?.[index] ?? 0,
   }))
 
+  const temperature = observation?.temperature ?? json.current?.temperature_2m ?? daily[0]?.max ?? 0
+  const humidity = observation?.humidity ?? json.current?.relative_humidity_2m ?? 0
+  const wind = observation?.wind ?? json.current?.wind_speed_10m ?? 0
+
   return {
     city: cityLabel(place),
+    source: observation ? `Estação ${observation.station.icao} + Open-Meteo` : 'Open-Meteo',
+    fetchedAt: new Date().toISOString(),
+    timezone: json.timezone ?? 'America/Sao_Paulo',
+    station: observation?.station,
     current: {
-      temperature: json.current?.temperature_2m ?? daily[0]?.max ?? 0,
-      humidity: json.current?.relative_humidity_2m ?? 0,
-      wind: json.current?.wind_speed_10m ?? 0,
+      temperature,
+      apparentTemperature: observation ? apparentTemperature(temperature, humidity, wind) : json.current?.apparent_temperature ?? temperature,
+      humidity,
+      wind,
       code: json.current?.weather_code ?? daily[0]?.code ?? 0,
+      rainChance: json.current?.precipitation_probability ?? 0,
+      precipitation: json.current?.precipitation ?? 0,
+      observedAt: observation?.observedAt ?? json.current?.time ?? '',
     },
     today: {
       min: daily[0]?.min ?? 0,
@@ -150,6 +208,25 @@ async function loadWeather(city: string, signal?: AbortSignal): Promise<WeatherD
     },
     daily,
   }
+}
+
+async function fetchCurrentObservation(latitude: number, longitude: number, signal?: AbortSignal): Promise<CurrentObservation | null> {
+  const params = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude) })
+  try {
+    const response = await fetch(`/api/weather-current?${params.toString()}`, { signal })
+    if (response.status === 204 || !response.ok) return null
+    const observation = await response.json() as CurrentObservation
+    if (!Number.isFinite(observation.temperature) || !Number.isFinite(observation.humidity) || !Number.isFinite(observation.wind)) return null
+    return observation
+  } catch (error) {
+    if (signal?.aborted) throw error
+    return null
+  }
+}
+
+function apparentTemperature(temperature: number, humidity: number, windKmH: number) {
+  const vaporPressure = humidity / 100 * 6.105 * Math.exp(17.27 * temperature / (237.7 + temperature))
+  return temperature + 0.33 * vaporPressure - 0.7 * (windKmH / 3.6) - 4
 }
 
 function normalizeCityInput(value: string) {
