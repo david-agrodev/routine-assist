@@ -34,6 +34,7 @@ export const SearchIcon = (p:P) => <svg {...base} {...p}><circle cx="10.5" cy="1
 export const ArchiveIcon = (p:P) => <svg {...base} {...p}><path d="M5 7h14v12H5z"/><path d="M4 4h16v3H4zM9 11h6"/></svg>
 export const PrintIcon = (p:P) => <svg {...base} {...p}><path d="M7 9V4h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><path d="M7 14h10v6H7z"/><path d="M17 12h.01"/></svg>
 export const CopyIcon = (p:P) => <svg {...base} {...p}><rect x="8" y="8" width="11" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h2"/></svg>
+export const DownloadIcon = (p:P) => <svg {...base} {...p}><path d="M12 3v12M7.5 10.5 12 15l4.5-4.5"/><path d="M5 19h14"/></svg>
 
 export const EyeIcon = (p:P) => <svg {...base} {...p}><path d="M2.8 12s3.4-5.5 9.2-5.5 9.2 5.5 9.2 5.5-3.4 5.5-9.2 5.5S2.8 12 2.8 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
 export const EyeOffIcon = (p:P) => <svg {...base} {...p}><path d="m4 4 16 16"/><path d="M9.2 6.9A9.8 9.8 0 0 1 12 6.5c5.8 0 9.2 5.5 9.2 5.5a15.5 15.5 0 0 1-3 3.5M14.7 14.7a3.7 3.7 0 0 1-5.4-5.4M6.1 8.1A16 16 0 0 0 2.8 12s3.4 5.5 9.2 5.5a9.7 9.7 0 0 0 3-.5"/></svg>
@@ -48,3 +49,6 @@ export const FarmIcon = (p:P) => <svg {...base} {...p}><path d="m3.5 10 8.5-6 8.
 export const CollarIcon = (p:P) => <svg {...base} {...p}><path d="M5 7.5c4.5 2 9.5 2 14 0l-1 7.8a3 3 0 0 1-3 2.7H9a3 3 0 0 1-3-2.7Z"/><path d="M8 9v3M16 9v3"/><circle cx="12" cy="14.5" r="1.5"/></svg>
 export const NotesIcon = (p:P) => <svg {...base} {...p}><path d="M6 3.5h9l3 3V20H6Z"/><path d="M15 3.5V7h3M9 11h6M9 14.5h6M9 18h3"/></svg>
 export const SaveIcon = (p:P) => <svg {...base} {...p}><path d="M5 4h12l2 2v14H5Z"/><path d="M8 4v6h8V4M8 20v-6h8v6"/></svg>
+export const RequestIcon = (p:P) => <svg {...base} {...p}><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 4V2.8h6V4M8.5 9h7M8.5 13h4"/><circle cx="16.5" cy="16.5" r="3.2" fill="currentColor" stroke="none"/><path d="M16.5 14.9v3.2M14.9 16.5h3.2" stroke="#fff" strokeWidth="1.4"/></svg>
+export const LockIcon = (p:P) => <svg {...base} {...p}><rect x="5" y="10" width="14" height="10" rx="2.5"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10M12 14v2.5"/></svg>
+export const PhoneIcon = (p:P) => <svg {...base} {...p}><path d="M7.2 3.8 10 8.5 7.8 10a15 15 0 0 0 6.2 6.2l1.5-2.2 4.7 2.8-.7 3a2.2 2.2 0 0 1-2.3 1.7C9.7 20.7 3.3 14.3 2.5 6.8A2.2 2.2 0 0 1 4.2 4.5Z"/></svg>

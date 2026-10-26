@@ -1,13 +1,13 @@
 import { addDays, endOfWeek, format, isAfter, isBefore, isSameDay, isToday, isWeekend, parseISO, startOfWeek } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { CheckIcon, LocationIcon } from './Icons'
+import { CheckIcon, LocationIcon, RequestIcon } from './Icons'
 import { TripCalendarIcon, TripLogisticsIcons, TripStatusBadge, tripDone } from './CalendarTripVisuals'
 import { appointmentCompanyKey, companyClass, companyLabel, tripCompanyKey } from '../lib/company'
 import { compactTripClients, compactTripCommercials, compactTripStops, holidayForDate } from '../lib/calendar'
 import { tripDisplayTitle } from '../lib/tripTitle'
 import { TripWeatherChip } from './TripWeather'
 import { formatScheduleTime } from '../lib/format'
-import type { Appointment, Demand, Holiday, Trip } from '../types/routine'
+import type { Appointment, BookingRequest, Demand, Holiday, Trip } from '../types/routine'
 
 function asDate(value: string | Date) { return typeof value === 'string' ? parseISO(value) : value }
 function occursOnDay(start: string, end: string, day: Date) {
@@ -25,7 +25,7 @@ function rangeContext(start: string, end: string, day: Date) {
 const demandForAppointment = (appointment: Appointment, demands: Demand[]) => appointment.demandId ? demands.find(d => d.id === appointment.demandId) : undefined
 const appointmentDone = (appointment: Appointment, demands: Demand[]) => demandForAppointment(appointment, demands)?.status === 'done'
 const appointmentRemote = (appointment: Appointment) => appointment.type === 'Remoto'
-export function MobileAgenda({ compact=false, trips=[], appointments=[], demands=[], holidays=[], weekStart, onDaySelect }: { compact?: boolean; trips?: Trip[]; appointments?: Appointment[]; demands?: Demand[]; holidays?: Holiday[]; weekStart?: string | Date; onDaySelect?: (day: Date) => void }) {
+export function MobileAgenda({ compact=false, trips=[], appointments=[], bookingRequests=[], demands=[], holidays=[], weekStart, onDaySelect, onBookingRequestSelect }: { compact?: boolean; trips?: Trip[]; appointments?: Appointment[]; bookingRequests?: BookingRequest[]; demands?: Demand[]; holidays?: Holiday[]; weekStart?: string | Date; onDaySelect?: (day: Date) => void; onBookingRequestSelect?: (request: BookingRequest) => void }) {
   const base = startOfWeek(asDate(weekStart ?? new Date()), { weekStartsOn: 1 })
   const weekEnd = endOfWeek(base, { weekStartsOn: 1 })
   const days = Array.from({length:7}, (_,i)=>addDays(base,i))
@@ -43,7 +43,8 @@ export function MobileAgenda({ compact=false, trips=[], appointments=[], demands
         if (isBefore(e,base)||isAfter(s,weekEnd)) return false
         return occursOnDay(a.start,a.end,day)
       })
-      const empty = dayTrips.length===0 && dayAppointments.length===0
+      const dayRequests = bookingRequests.filter(request => request.status === 'pending' && occursOnDay(request.start, request.end, day))
+      const empty = dayTrips.length===0 && dayAppointments.length===0 && dayRequests.length===0
       const today=isToday(day)
       return <article className={`agenda-day ${empty ? 'agenda-day-muted':''} ${isWeekend(day)?'weekend':''} ${holiday?'holiday':''} ${today?'today':''}`} key={day.toISOString()}>
         <button type="button" className="agenda-date agenda-date-button" onClick={()=>onDaySelect?.(day)} aria-current={today?'date':undefined} aria-label={`Ver resumo de ${format(day,"d 'de' MMMM",{locale:ptBR})}`}>
@@ -52,6 +53,7 @@ export function MobileAgenda({ compact=false, trips=[], appointments=[], demands
         <div className="agenda-content">
           {dayTrips.map(t=>{const key=tripCompanyKey(t,demands); const commercial=compactTripCommercials(t,demands,2); const done=tripDone(t,demands); return <button type="button" className={`agenda-trip agenda-event-button ${companyClass(key)} ${done?'calendar-event-done':''}`} key={t.id} onClick={()=>onDaySelect?.(day)}><span className="agenda-company-line"></span><TripCalendarIcon/><div><span className="mobile-company-badge">{companyLabel(key)}</span><strong>{compactTripStops(t,2)}{done&&<span className="calendar-done-badge"><CheckIcon/> Concluída</span>}</strong><span>{compactTripClients(t,2)} • {rangeContext(t.start,t.end,day)}</span><span className="calendar-event-tags"><TripStatusBadge trip={t}/><TripWeatherChip trip={t}/></span>{commercial&&<small>Comercial: {commercial}</small>}<small className="agenda-trip-footer"><span>{tripDisplayTitle(t)}</span><TripLogisticsIcons trip={t} done={done}/></small></div></button>})}
           {dayAppointments.map(a=>{const key=appointmentCompanyKey(a,demands); const done=appointmentDone(a,demands); const remote=appointmentRemote(a); return <button type="button" className={`agenda-appointment agenda-event-button ${companyClass(key)} ${done?'calendar-event-done':''} ${remote?'calendar-event-remote':''}`} key={a.id} onClick={()=>onDaySelect?.(day)}><span className="agenda-company-line"></span><div><span className="mobile-company-badge">{companyLabel(key)}</span><strong>{a.farmName || a.client}{remote&&<span className="calendar-remote-badge">Remoto</span>}{done&&<span className="calendar-done-badge"><CheckIcon/> Concluída</span>}</strong><span>{a.client} • {formatScheduleTime(a)} • {remote?'atendimento remoto':'sem viagem'}</span>{(a.city||a.state)&&<small><LocationIcon/> {[a.city,a.state].filter(Boolean).join('/')}</small>}</div><b>{rangeContext(a.start,a.end,day)}</b></button>})}
+          {dayRequests.map(request=><button type="button" className="agenda-booking-request agenda-event-button" key={request.id} onClick={()=>onBookingRequestSelect?.(request)}><RequestIcon/><div><span className="mobile-company-badge">Solicitação</span><strong>{request.farmName}</strong><span>{request.central} • aguardando aprovação</span><small>{request.clientName} • {request.city}/{request.state}</small></div><b>{rangeContext(request.start,request.end,day)}</b></button>)}
           {empty && <button type="button" className="agenda-free agenda-free-button" onClick={()=>onDaySelect?.(day)}>{holiday?holiday.name:isWeekend(day)?'Fim de semana livre':'Livre'} • ver resumo</button>}
         </div>
       </article>

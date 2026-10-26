@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useAuth } from './AuthContext'
+import { supabase } from '../lib/supabase'
 import {
   addLodging as addLodgingDb,
   cancelControlTechIntegrationRequest as cancelControlTechIntegrationRequestDb,
@@ -13,6 +14,7 @@ import {
   deleteTrip as deleteTripDb,
   createTrip as createTripDb,
   getAppointments,
+  getBookingRequests,
   getCompanies,
   getControlTechIntegrationRequests,
   getHotels,
@@ -28,6 +30,7 @@ import {
   saveTripRoute as saveTripRouteDb,
   saveNotificationPreferences as saveNotificationPreferencesDb,
   retryControlTechIntegrationRequest as retryControlTechIntegrationRequestDb,
+  reviewBookingRequest as reviewBookingRequestDb,
   updateDemand as updateDemandDb,
   updateAppointment as updateAppointmentDb,
   updateTrip as updateTripDb,
@@ -38,6 +41,7 @@ import type {
   Appointment,
   AppointmentConflict,
   AppointmentTimingInput,
+  BookingRequest,
   Company,
   ControlTechIntegrationRequest,
   CreateControlTechIntegrationRequestInput,
@@ -65,6 +69,7 @@ type RoutineContextValue = {
   companies: Company[]
   hotels: Hotel[]
   controlTechIntegrationRequests: ControlTechIntegrationRequest[]
+  bookingRequests: BookingRequest[]
   notificationPreferences: NotificationPreferences
   userProfile: UserProfile | null
   loading: boolean
@@ -75,6 +80,7 @@ type RoutineContextValue = {
   cancelControlTechIntegrationRequest: (requestId: string) => Promise<ControlTechIntegrationRequest>
   retryControlTechIntegrationRequest: (requestId: string) => Promise<ControlTechIntegrationRequest>
   processControlTechIntegrationRequest: (requestId: string) => Promise<ControlTechIntegrationRequest>
+  reviewBookingRequest: (requestId: string, decision: 'approved' | 'rejected', notes?: string) => Promise<void>
   updateDemand: (demandId: string, input: UpdateDemandInput) => Promise<void>
   deleteDemand: (demandId: string) => Promise<void>
   deleteTrip: (tripId: string) => Promise<void>
@@ -105,6 +111,7 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
   const [companies, setCompanies] = useState<Company[]>([])
   const [hotels, setHotels] = useState<Hotel[]>([])
   const [controlTechIntegrationRequests, setControlTechIntegrationRequests] = useState<ControlTechIntegrationRequest[]>([])
+  const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([])
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({ alertDays:[14,7,3,1], inAppEnabled:true, pushEnabled:false })
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(false)
@@ -115,13 +122,14 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      const [d, t, a, c, h, integrations, prefs, profile] = await Promise.all([
+      const [d, t, a, c, h, integrations, requests, prefs, profile] = await Promise.all([
         getDemands(workspaceId),
         getTrips(workspaceId),
         getAppointments(workspaceId),
         getCompanies(workspaceId),
         getHotels(workspaceId),
         getControlTechIntegrationRequests(workspaceId),
+        getBookingRequests(workspaceId),
         user ? getNotificationPreferences(user.id) : Promise.resolve({ alertDays:[14,7,3,1], inAppEnabled:true, pushEnabled:false }),
         user ? getUserProfile(user.id) : Promise.resolve(null),
       ])
@@ -131,6 +139,7 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
       setCompanies(c)
       setHotels(h)
       setControlTechIntegrationRequests(integrations)
+      setBookingRequests(requests)
       setNotificationPreferences(prefs)
       setUserProfile(profile)
     } catch (err: any) {
@@ -141,6 +150,24 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
   }, [workspaceId, user])
 
   useEffect(() => { void refresh() }, [refresh])
+
+  useEffect(() => {
+    const client = supabase
+    if (!client || !workspaceId) return
+    const channel = client
+      .channel(`booking-requests:${workspaceId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'booking_requests',
+        filter: `workspace_id=eq.${workspaceId}`,
+      }, () => {
+        void getBookingRequests(workspaceId).then(setBookingRequests).catch(() => undefined)
+      })
+      .subscribe()
+
+    return () => { void client.removeChannel(channel) }
+  }, [workspaceId])
 
   const createDemand = async (input: CreateDemandInput) => {
     if (!workspaceId || !user) throw new Error('Usuário/workspace indisponível.')
@@ -175,6 +202,11 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     const updated = await processControlTechIntegrationRequestDb(workspaceId, requestId)
     setControlTechIntegrationRequests(current => current.map(request => request.id === requestId ? updated : request))
     return updated
+  }
+
+  const reviewBookingRequest = async (requestId: string, decision: 'approved' | 'rejected', notes?: string) => {
+    await reviewBookingRequestDb(requestId, decision, notes)
+    await refresh()
   }
 
   const updateDemand = async (demandId: string, input: UpdateDemandInput) => {
@@ -299,10 +331,10 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
   }
 
   const value = useMemo(() => ({
-    demands, trips, appointments, companies, hotels, controlTechIntegrationRequests, notificationPreferences, userProfile, loading, error, refresh,
-    createDemand, createControlTechIntegrationRequest, cancelControlTechIntegrationRequest, retryControlTechIntegrationRequest, processControlTechIntegrationRequest, updateDemand, deleteDemand, deleteTrip, completeTrip, cancelAppointment, checkAppointmentConflicts, scheduleDemand, updateAppointment,
+    demands, trips, appointments, companies, hotels, controlTechIntegrationRequests, bookingRequests, notificationPreferences, userProfile, loading, error, refresh,
+    createDemand, createControlTechIntegrationRequest, cancelControlTechIntegrationRequest, retryControlTechIntegrationRequest, processControlTechIntegrationRequest, reviewBookingRequest, updateDemand, deleteDemand, deleteTrip, completeTrip, cancelAppointment, checkAppointmentConflicts, scheduleDemand, updateAppointment,
     createTrip, updateTrip, linkAppointmentsToTrip, unlinkAppointmentFromTrip, addLodging, saveVehicleReservation, saveFlightReservation, saveTripRoute, saveNotificationPreferences, updateUserProfile,
-  }), [demands, trips, appointments, companies, hotels, controlTechIntegrationRequests, notificationPreferences, userProfile, loading, error, refresh])
+  }), [demands, trips, appointments, companies, hotels, controlTechIntegrationRequests, bookingRequests, notificationPreferences, userProfile, loading, error, refresh])
 
   return <RoutineContext.Provider value={value}>{children}</RoutineContext.Provider>
 }

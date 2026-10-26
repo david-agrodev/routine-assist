@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { BellIcon, CalendarIcon, HomeIcon, InboxIcon, ListIcon, LogoutIcon, MenuIcon, PlusIcon, SettingsIcon, ToolIcon, TripIcon } from './Icons'
+import { BellIcon, CalendarIcon, HomeIcon, InboxIcon, ListIcon, LogoutIcon, MenuIcon, PlusIcon, RequestIcon, SettingsIcon, ToolIcon, TripIcon } from './Icons'
 import { NotificationPanel } from './NotificationPanel'
 import { useAuth } from '../context/AuthContext'
 import { useRoutine } from '../context/RoutineContext'
@@ -12,13 +12,15 @@ const CONTROL_TECH_URL = import.meta.env.VITE_CONTROL_TECH_URL || 'https://contr
 const nav = [
   { to: '/', label: 'Início', icon: HomeIcon },
   { to: '/entrada', label: 'Entrada', icon: InboxIcon },
+  { to: '/solicitacoes', label: 'Solicitações', icon: RequestIcon },
   { to: '/calendario', label: 'Agenda', icon: CalendarIcon },
   { to: '/viagens', label: 'Viagens', icon: TripIcon },
   { to: '/relatorios', label: 'Relatórios', icon: ListIcon },
   { to: '/integracoes', label: 'Control Tech', icon: ToolIcon },
 ]
-const mobilePrimaryNav = nav.slice(0, 4)
-const mobileSecondaryNav = nav.slice(4)
+const mobilePrimaryPaths = new Set(['/', '/entrada', '/calendario', '/viagens'])
+const mobilePrimaryNav = nav.filter(item => mobilePrimaryPaths.has(item.to))
+const mobileSecondaryNav = nav.filter(item => !mobilePrimaryPaths.has(item.to))
 
 function initials(nameOrEmail: string) {
   const clean = nameOrEmail.split('@')[0].trim()
@@ -35,9 +37,10 @@ export function Layout({ children, onNewDemand }: { children: React.ReactNode; o
   const navigate=useNavigate()
   const location=useLocation()
   const { user, signOut } = useAuth()
-  const { demands, trips, notificationPreferences, userProfile } = useRoutine()
+  const { demands, trips, bookingRequests, notificationPreferences, userProfile } = useRoutine()
   const pendingItems = buildPendingItems(demands, trips, notificationPreferences)
-  const notificationCount = pendingItems.length
+  const pendingBookingCount = bookingRequests.filter(request => request.status === 'pending').length
+  const notificationCount = pendingItems.length + pendingBookingCount
   const display = userProfile?.fullName || user?.user_metadata?.full_name || user?.email || 'Usuário'
   const mobileMoreActive = mobileSecondaryNav.some(item => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`))
 

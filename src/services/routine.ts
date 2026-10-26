@@ -5,6 +5,9 @@ import type {
   AddLodgingInput,
   Appointment,
   AppointmentTimingInput,
+  BookingAvailabilityDay,
+  BookingLink,
+  BookingRequest,
   Company,
   ControlTechIntegrationRequest,
   CreateDemandInput,
@@ -18,6 +21,7 @@ import type {
   Hotel,
   NotificationPreferences,
   SaveTripRouteInput,
+  SubmitBookingRequestInput,
   UserProfile,
   UpdateUserProfileInput,
 } from '../types/routine'
@@ -49,6 +53,46 @@ function normalizeFlightSegments(value: any) {
     }))
     .filter(segment => segment.origin || segment.destination || segment.flightNumber)
 }
+
+function mapBookingRequest(row: any): BookingRequest {
+  return {
+    id: row.id,
+    code: row.request_code,
+    central: row.central,
+    requesterName: row.requester_name,
+    requesterEmail: row.requester_email || undefined,
+    requesterPhone: row.requester_phone || undefined,
+    clientName: row.client_name,
+    farmName: row.farm_name,
+    city: row.city,
+    state: row.state,
+    commercialResponsible: row.commercial_responsible,
+    quantityCollars: Number(row.quantity_collars || 0),
+    extraAntennaCount: Number(row.extra_antenna_count || 0),
+    appointmentType: row.appointment_type === 'remoto' ? 'Remoto' : 'Presencial',
+    start: row.starts_at,
+    end: row.ends_at,
+    preferredStartTime: row.preferred_start_time ? String(row.preferred_start_time).slice(0, 5) : undefined,
+    preferredEndTime: row.preferred_end_time ? String(row.preferred_end_time).slice(0, 5) : undefined,
+    notes: row.notes || undefined,
+    holidayAcknowledged: Boolean(row.holiday_acknowledged),
+    status: row.status,
+    reviewedAt: row.reviewed_at || undefined,
+    reviewNotes: row.review_notes || undefined,
+    demandId: row.demand_id || undefined,
+    appointmentId: row.appointment_id || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+const bookingRequestSelect = `
+  id,request_code,central,requester_name,requester_email,requester_phone,
+  client_name,farm_name,city,state,commercial_responsible,quantity_collars,extra_antenna_count,
+  appointment_type,starts_at,ends_at,preferred_start_time,preferred_end_time,
+  notes,holiday_acknowledged,status,reviewed_at,review_notes,demand_id,
+  appointment_id,created_at,updated_at
+`
 
 function mapControlTechIntegrationRequest(row: any): ControlTechIntegrationRequest {
   const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
@@ -93,6 +137,76 @@ export async function getCompanies(workspaceId: string): Promise<Company[]> {
     .order('name')
   if (error) throw error
   return (data ?? []).map((row: any) => ({ id: row.id, name: row.name, productName: row.product_name ?? undefined }))
+}
+
+export async function getOrCreateBookingLink(workspaceId: string): Promise<BookingLink> {
+  const client = requireClient()
+  const { data, error } = await client.rpc('get_or_create_booking_link', { target_workspace: workspaceId })
+  if (error) throw error
+  const row = asArray<any>(data)[0]
+  if (!row?.id || !row?.public_token) throw new Error('Não foi possível preparar o link público da agenda.')
+  return { id: row.id, token: row.public_token, active: row.is_active !== false }
+}
+
+export async function setBookingLinkActive(workspaceId: string, linkId: string, active: boolean): Promise<void> {
+  const client = requireClient()
+  const { error } = await client
+    .from('booking_links')
+    .update({ is_active: active })
+    .eq('workspace_id', workspaceId)
+    .eq('id', linkId)
+  if (error) throw error
+}
+
+export async function getPublicBookingAvailability(token: string, start: string, end: string): Promise<BookingAvailabilityDay[]> {
+  const client = requireClient()
+  const { data, error } = await client.rpc('get_public_booking_availability', {
+    target_token: token,
+    range_start: start,
+    range_end: end,
+  })
+  if (error) throw error
+  const rows = asArray<any>(data)
+  if (!rows.length) throw new Error('Este link de agenda não existe ou está desativado.')
+  return rows.map(row => ({ date: row.calendar_date, available: Boolean(row.is_available) }))
+}
+
+export async function submitPublicBookingRequest(token: string, input: SubmitBookingRequestInput): Promise<{ id: string; code: string }> {
+  const client = requireClient()
+  const { data, error } = await client.rpc('submit_public_booking_request', {
+    target_token: token,
+    request_data: input,
+  })
+  if (error) throw error
+  const row = asArray<any>(data)[0]
+  if (!row?.id || !row?.request_code) throw new Error('A solicitação não pôde ser registrada.')
+  return { id: row.id, code: row.request_code }
+}
+
+export async function getBookingRequests(workspaceId: string): Promise<BookingRequest[]> {
+  const client = requireClient()
+  const { data, error } = await client
+    .from('booking_requests')
+    .select(bookingRequestSelect)
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+  if (error && ['42P01', 'PGRST205'].includes(error.code || '')) return []
+  if (error) throw error
+  return (data ?? []).map(mapBookingRequest)
+}
+
+export async function reviewBookingRequest(
+  requestId: string,
+  decision: 'approved' | 'rejected',
+  notes?: string,
+): Promise<void> {
+  const client = requireClient()
+  const { error } = await client.rpc('review_public_booking_request', {
+    target_request: requestId,
+    decision,
+    reviewer_notes: notes?.trim() || null,
+  })
+  if (error) throw error
 }
 
 export async function getDemands(workspaceId: string): Promise<Demand[]> {

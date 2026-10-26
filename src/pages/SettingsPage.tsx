@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
-import { BellIcon, CheckIcon, PlaneIcon, UserIcon } from '../components/Icons'
+import { BellIcon, CheckIcon, CopyIcon, PlaneIcon, RequestIcon, UserIcon } from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
 import { BrandMark } from '../components/BrandMark'
 import { useRoutine } from '../context/RoutineContext'
 import { usePwaInstall } from '../hooks/usePwaInstall'
 import { pushNotificationsConfigured, subscribeToPushNotifications, unsubscribeFromPushNotifications } from '../services/pushNotifications'
+import { getOrCreateBookingLink, setBookingLinkActive } from '../services/routine'
+import type { BookingLink } from '../types/routine'
 
 const options=[14,7,3,1]
 
 export function SettingsPage(){
-  const { user, signOut } = useAuth()
+  const { user, workspaceId, signOut } = useAuth()
   const { notificationPreferences, saveNotificationPreferences, userProfile, updateUserProfile } = useRoutine()
   const [alertDays,setAlertDays]=useState(notificationPreferences.alertDays)
   const [inApp,setInApp]=useState(notificationPreferences.inAppEnabled)
@@ -21,6 +23,8 @@ export function SettingsPage(){
   const [saving,setSaving]=useState(false)
   const [savingProfile,setSavingProfile]=useState(false)
   const [message,setMessage]=useState('')
+  const [bookingLink,setBookingLink]=useState<BookingLink|null>(null)
+  const [bookingLinkLoading,setBookingLinkLoading]=useState(false)
   const { installed, isIos, canPromptInstall, install } = usePwaInstall()
 
   useEffect(()=>{setAlertDays(notificationPreferences.alertDays);setInApp(notificationPreferences.inAppEnabled);setPush(notificationPreferences.pushEnabled)},[notificationPreferences])
@@ -30,6 +34,13 @@ export function SettingsPage(){
     setPhone(userProfile?.phone || '')
     setBirthDate(userProfile?.birthDate || '')
   },[userProfile,user])
+  useEffect(()=>{
+    if(!workspaceId)return
+    let active=true
+    setBookingLinkLoading(true)
+    void getOrCreateBookingLink(workspaceId).then(link=>{if(active)setBookingLink(link)}).catch(error=>{if(active)setMessage(error?.message||'Não foi possível preparar o link da agenda.')}).finally(()=>{if(active)setBookingLinkLoading(false)})
+    return()=>{active=false}
+  },[workspaceId])
 
   const requestNotifications = async () => {
     if (!user) return
@@ -59,6 +70,18 @@ export function SettingsPage(){
     try{await updateUserProfile({fullName:fullName.trim(),cpf:cpf.trim()||undefined,phone:phone.trim()||undefined,birthDate:birthDate||undefined});setMessage('Dados do passageiro salvos. Eles serão usados automaticamente nas solicitações de voo.')}catch(e:any){setMessage(e?.message||'Não foi possível salvar o perfil.')}finally{setSavingProfile(false)}
   }
   const displayName = userProfile?.fullName || user?.user_metadata?.full_name || 'Usuário'
+  const publicBookingUrl = bookingLink ? `${window.location.origin}/solicitar-agendamento/${bookingLink.token}` : ''
+  const copyBookingLink=async()=>{
+    if(!publicBookingUrl)return
+    try{await navigator.clipboard.writeText(publicBookingUrl);setMessage('Link público copiado.')}catch{setMessage('Não foi possível copiar automaticamente. Selecione o link abaixo.')}
+  }
+  const toggleBookingLink=async(active:boolean)=>{
+    if(!workspaceId||!bookingLink||bookingLinkLoading)return
+    setBookingLinkLoading(true);setMessage('')
+    try{await setBookingLinkActive(workspaceId,bookingLink.id,active);setBookingLink({...bookingLink,active});setMessage(active?'Link público ativado.':'Link público pausado. Novos pedidos não serão aceitos.')}
+    catch(error:any){setMessage(error?.message||'Não foi possível alterar o link.')}
+    finally{setBookingLinkLoading(false)}
+  }
 
   return <>
     <section className="page-heading"><div><span className="eyebrow">Preferências</span><h1>Configurações</h1><p>Personalize alertas, dados do passageiro e o uso do app no computador e no celular.</p></div></section>
@@ -70,6 +93,14 @@ export function SettingsPage(){
         <div className="form-grid profile-grid"><label className="field field-wide"><span>Nome completo *</span><input value={fullName} onChange={e=>setFullName(e.target.value)} placeholder="Nome completo"/></label><label className="field"><span>CPF</span><input value={cpf} onChange={e=>setCpf(e.target.value)} placeholder="000.000.000-00"/></label><label className="field"><span>Telefone</span><input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="(00) 00000-0000"/></label><label className="field"><span>Data de nascimento</span><input type="date" value={birthDate} onChange={e=>setBirthDate(e.target.value)}/></label></div>
         <div className="profile-flight-note"><PlaneIcon/><span>Esses dados são usados apenas para montar a solicitação no Outlook. A reserva continua sendo feita pela empresa.</span></div>
         <button className="primary compact" disabled={!fullName.trim()||savingProfile} onClick={()=>void saveProfile()}>{savingProfile?'Salvando...':'Salvar dados do passageiro'}</button>
+      </section>
+
+      <section className="panel setting-card setting-wide booking-link-card">
+        <div className="setting-title"><RequestIcon/><div><h2>Agenda compartilhada</h2><p>Envie este link para centrais solicitarem datas sem visualizar os detalhes da sua agenda.</p></div></div>
+        {bookingLinkLoading && !bookingLink ? <div className="soft-note">Preparando seu link seguro...</div> : bookingLink ? <>
+          <div className="booking-link-control"><input readOnly value={publicBookingUrl}/><button className="secondary" type="button" onClick={()=>void copyBookingLink()}><CopyIcon/> Copiar link</button></div>
+          <div className="preference-toggle-row"><span><strong>Receber novas solicitações</strong><small>{bookingLink.active?'O link está ativo e as datas pendentes serão bloqueadas.':'O link está pausado e não aceita novos pedidos.'}</small></span><input type="checkbox" checked={bookingLink.active} disabled={bookingLinkLoading} onChange={event=>void toggleBookingLink(event.target.checked)}/></div>
+        </> : <div className="soft-note">Não foi possível carregar o link público.</div>}
       </section>
 
       <section className="panel setting-card setting-wide"><div className="setting-title"><BellIcon/><div><h2>Alertas antecipados</h2><p>Escolha quando o Routine deve começar a cobrar hotel, veículo e passagem pendentes.</p></div></div>

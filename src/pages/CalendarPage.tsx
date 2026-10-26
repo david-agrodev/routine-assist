@@ -7,17 +7,17 @@ import { MobileAgenda } from '../components/MobileAgenda'
 import { MonthCalendar } from '../components/MonthCalendar'
 import { AgendaSummaryModal } from '../components/AgendaSummaryModal'
 import { DemandDetailModal } from '../components/DemandDetailModal'
-import { AlertIcon, CalendarIcon, CheckIcon, RouteIcon } from '../components/Icons'
+import { AlertIcon, CalendarIcon, CheckIcon, RequestIcon, RouteIcon } from '../components/Icons'
 import { tripReadinessStatus } from '../components/CalendarTripVisuals'
 import { useRoutine } from '../context/RoutineContext'
 import { tripCompanyKeys } from '../lib/company'
 import { getBrazilHolidaysForYears } from '../services/holidays'
-import type { Demand, Holiday, Trip } from '../types/routine'
+import type { BookingRequest, Demand, Holiday, Trip } from '../types/routine'
 
 type ViewMode='month'|'week'|'agenda'
 
 export function CalendarPage(){
-  const { trips, appointments, demands } = useRoutine()
+  const { trips, appointments, bookingRequests, demands } = useRoutine()
   const linkedAppointments = useMemo(()=>{
     const ids = new Set<string>()
     const demandIds = new Set<string>()
@@ -60,6 +60,7 @@ export function CalendarPage(){
   },[holidays,periodStart,periodEnd])
 
   const periodTrips=useMemo(()=>trips.filter(trip=>!isBefore(parseISO(trip.end),periodStart)&&!isAfter(parseISO(trip.start),periodEnd)),[trips,periodStart,periodEnd])
+  const periodRequests=useMemo(()=>bookingRequests.filter(request=>request.status==='pending'&&!isBefore(parseISO(request.end),periodStart)&&!isAfter(parseISO(request.start),periodEnd)),[bookingRequests,periodStart,periodEnd])
   const periodTripStats=useMemo(()=>({
     total: periodTrips.length,
     alta: periodTrips.filter(trip=>tripCompanyKeys(trip,demands).includes('alta')).length,
@@ -85,6 +86,7 @@ export function CalendarPage(){
   const changeMode=(nextMode:ViewMode)=>{setMode(nextMode);setAnchor(new Date())}
   const openDemand=(demand:Demand)=>{setSummaryDate(null);setSelectedDemand(demand)}
   const openTrip=(trip:Trip)=>{setSummaryDate(null);navigate(`/viagens?trip=${encodeURIComponent(trip.id)}`)}
+  const openBookingRequest=(request:BookingRequest)=>{setSummaryDate(null);navigate(`/solicitacoes?request=${encodeURIComponent(request.id)}`)}
 
   return <>
     <section className="page-heading calendar-page-heading">
@@ -106,6 +108,7 @@ export function CalendarPage(){
       <article className="company-genex"><i/><div><span>GENEX Brasil</span><strong>{periodTripStats.genex}</strong></div></article>
       <article className="company-alta"><i/><div><span>ALTA Genetics</span><strong>{periodTripStats.alta}</strong></div></article>
       <article className={periodTripStats.pending?'pending':'ok'}>{periodTripStats.pending?<AlertIcon/>:<CheckIcon/>}<div><span>Pendências</span><strong>{periodTripStats.pending}</strong></div></article>
+      <article className={periodRequests.length?'booking-pending':'ok'}>{periodRequests.length?<RequestIcon/>:<CheckIcon/>}<div><span>Solicitações</span><strong>{periodRequests.length}</strong></div></article>
     </section>
 
     <section className="panel calendar-main-panel redesigned-calendar-panel">
@@ -114,15 +117,15 @@ export function CalendarPage(){
         <div className="calendar-period-copy"><span className="eyebrow">Período</span><strong className="calendar-period-label">{label}</strong><small>Finais de semana e feriados são destacados. Toque em uma data para abrir o resumo.</small></div>
         <div className="calendar-toolbar-right"><button className="today-button" onClick={()=>setAnchor(new Date())}>Hoje</button><button aria-label="Próximo período" onClick={next}>›</button></div>
       </div>
-      {mode==='month' && <div className="desktop-month-calendar"><MonthCalendar month={month} trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} onDaySelect={setSummaryDate}/></div>}
-      {mode==='month' && <div className="mobile-month-fallback"><MonthCalendar month={month} trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} onDaySelect={setSummaryDate} mobile/></div>}
-      {mode==='week' && <div className="desktop-calendar"><WeekCalendar trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate}/></div>}
-      {mode==='week' && <div className="mobile-calendar"><MobileAgenda trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate}/></div>}
-      {mode==='agenda' && <MobileAgenda trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate}/>}
+      {mode==='month' && <div className="desktop-month-calendar"><MonthCalendar month={month} trips={trips} appointments={standaloneAppointments} bookingRequests={bookingRequests} demands={demands} holidays={holidays} onDaySelect={setSummaryDate} onBookingRequestSelect={openBookingRequest}/></div>}
+      {mode==='month' && <div className="mobile-month-fallback"><MonthCalendar month={month} trips={trips} appointments={standaloneAppointments} bookingRequests={bookingRequests} demands={demands} holidays={holidays} onDaySelect={setSummaryDate} onBookingRequestSelect={openBookingRequest} mobile/></div>}
+      {mode==='week' && <div className="desktop-calendar"><WeekCalendar trips={trips} appointments={standaloneAppointments} bookingRequests={bookingRequests} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate} onBookingRequestSelect={openBookingRequest}/></div>}
+      {mode==='week' && <div className="mobile-calendar"><MobileAgenda trips={trips} appointments={standaloneAppointments} bookingRequests={bookingRequests} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate} onBookingRequestSelect={openBookingRequest}/></div>}
+      {mode==='agenda' && <MobileAgenda trips={trips} appointments={standaloneAppointments} bookingRequests={bookingRequests} demands={demands} holidays={holidays} weekStart={week} onDaySelect={setSummaryDate} onBookingRequestSelect={openBookingRequest}/>}
     </section>
-    <div className="calendar-legend modern-calendar-legend"><span><i className="legend company-alta"></i> ALTA</span><span><i className="legend company-genex"></i> GENEX</span><span><i className="legend weekend"></i> Sábado / domingo</span><span><i className="legend holiday"></i> Feriado nacional</span><span><AlertIcon/> Datas ocupadas não podem receber outro atendimento.</span></div>
+    <div className="calendar-legend modern-calendar-legend"><span><i className="legend company-alta"></i> ALTA</span><span><i className="legend company-genex"></i> GENEX</span><span><i className="legend booking-request"></i> Solicitação pendente</span><span><i className="legend weekend"></i> Sábado / domingo</span><span><i className="legend holiday"></i> Feriado nacional</span><span><AlertIcon/> Datas ocupadas não podem receber outro atendimento.</span></div>
 
-    <AgendaSummaryModal date={summaryDate} trips={trips} appointments={standaloneAppointments} demands={demands} holidays={holidays} onClose={()=>setSummaryDate(null)} onOpenDemand={openDemand} onOpenTrip={openTrip}/>
+    <AgendaSummaryModal date={summaryDate} trips={trips} appointments={standaloneAppointments} bookingRequests={bookingRequests} demands={demands} holidays={holidays} onClose={()=>setSummaryDate(null)} onOpenDemand={openDemand} onOpenTrip={openTrip} onOpenBookingRequest={openBookingRequest}/>
     <DemandDetailModal demand={selectedDemand} onClose={()=>setSelectedDemand(null)}/>
   </>
 }

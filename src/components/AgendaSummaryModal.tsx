@@ -1,38 +1,43 @@
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { CalendarIcon, CarIcon, CheckIcon, HotelIcon, LocationIcon, PlaneIcon, RouteIcon } from './Icons'
+import { CalendarIcon, CarIcon, CheckIcon, HotelIcon, LocationIcon, PlaneIcon, RequestIcon, RouteIcon } from './Icons'
 import { formatDateRange, formatScheduleTime } from '../lib/format'
 import { isFlightReady, isHotelReady, isVehicleReady } from '../lib/tripReadiness'
 import { appointmentCompanyKey, companyClass, companyLabel, tripCompanyKey } from '../lib/company'
 import { compactTripCommercials, holidayForDate } from '../lib/calendar'
 import { tripDisplayTitle } from '../lib/tripTitle'
-import type { Appointment, Demand, Holiday, Trip } from '../types/routine'
+import type { Appointment, BookingRequest, Demand, Holiday, Trip } from '../types/routine'
 
 export function AgendaSummaryModal({
   date,
   trips,
   appointments,
+  bookingRequests=[],
   demands,
   holidays=[],
   onClose,
   onOpenDemand,
   onOpenTrip,
+  onOpenBookingRequest,
 }: {
   date: Date | null
   trips: Trip[]
   appointments: Appointment[]
+  bookingRequests?: BookingRequest[]
   demands: Demand[]
   holidays?: Holiday[]
   onClose: () => void
   onOpenDemand: (demand: Demand) => void
   onOpenTrip: (trip: Trip) => void
+  onOpenBookingRequest?: (request: BookingRequest) => void
 }) {
   if (!date) return null
   const dateKey = format(date, 'yyyy-MM-dd')
   const holiday=holidayForDate(holidays,date)
   const dayTrips = trips.filter(t => t.start <= dateKey && t.end >= dateKey)
   const dayAppointments = appointments.filter(a => a.start <= dateKey && a.end >= dateKey)
-  const empty = dayTrips.length === 0 && dayAppointments.length === 0
+  const dayRequests = bookingRequests.filter(request => request.status === 'pending' && request.start <= dateKey && request.end >= dateKey)
+  const empty = dayTrips.length === 0 && dayAppointments.length === 0 && dayRequests.length === 0
 
   return <div className="modal-backdrop" onMouseDown={e => e.target === e.currentTarget && onClose()}>
     <section className="modal-card agenda-summary-card">
@@ -87,6 +92,17 @@ export function AgendaSummaryModal({
             {demand && <button className="secondary compact summary-open" onClick={() => onOpenDemand(demand)}>Abrir demanda</button>}
           </article>
         })}
+
+        {dayRequests.map(request => <article className="agenda-summary-item booking-request" key={request.id}>
+          <div className="agenda-summary-icon"><RequestIcon/></div>
+          <div className="grow">
+            <div className="summary-title-line"><span className="company-badge request">Solicitação</span><span className="eyebrow">Aguardando aprovação</span></div>
+            <h3>{request.farmName}</h3>
+            <p>{request.clientName} • {request.central} • {formatDateRange(request.start,request.end)}</p>
+            <p className="summary-location"><LocationIcon/> {request.city}/{request.state}</p>
+          </div>
+          {onOpenBookingRequest&&<button className="secondary compact summary-open" onClick={()=>onOpenBookingRequest(request)}>Analisar pedido</button>}
+        </article>)}
       </div>}
 
       <div className="modal-actions agenda-summary-actions"><button className="ghost" onClick={onClose}>Fechar</button></div>

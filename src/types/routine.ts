@@ -149,6 +149,71 @@ export type Holiday = {
   type?: string
 }
 
+export type BookingRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+
+export type BookingLink = {
+  id: string
+  token: string
+  active: boolean
+}
+
+export type BookingAvailabilityDay = {
+  date: string
+  available: boolean
+}
+
+export type BookingRequest = {
+  id: string
+  code: string
+  central: string
+  requesterName: string
+  requesterEmail?: string
+  requesterPhone?: string
+  clientName: string
+  farmName: string
+  city: string
+  state: string
+  commercialResponsible: string
+  quantityCollars: number
+  extraAntennaCount: number
+  appointmentType: 'Presencial' | 'Remoto'
+  start: string
+  end: string
+  preferredStartTime?: string
+  preferredEndTime?: string
+  notes?: string
+  holidayAcknowledged: boolean
+  status: BookingRequestStatus
+  reviewedAt?: string
+  reviewNotes?: string
+  demandId?: string
+  appointmentId?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type SubmitBookingRequestInput = {
+  central: string
+  requesterName: string
+  requesterEmail?: string
+  requesterPhone?: string
+  clientName: string
+  farmName: string
+  city: string
+  state: string
+  commercialResponsible: string
+  quantityCollars: number
+  extraAntennaCount: number
+  appointmentType: 'onsite' | 'remote'
+  start: string
+  end: string
+  preferredStartTime?: string
+  preferredEndTime?: string
+  notes?: string
+  holidayAcknowledged: boolean
+  website?: string
+}
+
 export type Company = {
   id: string
   name: string
