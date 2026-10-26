@@ -4,6 +4,7 @@ import { suggestedTripTitle } from '../lib/tripTitle'
 import type {
   AddLodgingInput,
   Appointment,
+  AppointmentTimingInput,
   Company,
   ControlTechIntegrationRequest,
   CreateDemandInput,
@@ -281,7 +282,7 @@ export async function getAppointments(workspaceId: string): Promise<Appointment[
   const client = requireClient()
   const { data, error } = await client
     .from('appointments')
-    .select('id,demand_id,responsible_user_id,title,farm_name_snapshot,city_snapshot,state_snapshot,starts_at,ends_at,appointment_type,client_confirmed')
+    .select('id,demand_id,responsible_user_id,title,farm_name_snapshot,city_snapshot,state_snapshot,starts_at,ends_at,all_day,start_time,end_time,appointment_type,client_confirmed')
     .eq('workspace_id', workspaceId)
     .order('starts_at', { ascending: true })
   if (error) throw error
@@ -295,6 +296,9 @@ export async function getAppointments(workspaceId: string): Promise<Appointment[
     state: a.state_snapshot || undefined,
     start: a.starts_at,
     end: a.ends_at,
+    allDay: a.all_day !== false,
+    startTime: a.start_time ? String(a.start_time).slice(0, 5) : undefined,
+    endTime: a.end_time ? String(a.end_time).slice(0, 5) : undefined,
     type: a.appointment_type === 'presencial' ? 'Presencial' : a.appointment_type === 'remoto' ? 'Remoto' : 'A definir',
     responsible: a.responsible_user_id || undefined,
   }))
@@ -308,7 +312,7 @@ export async function getTrips(workspaceId: string): Promise<Trip[]> {
       id,title,origin,starts_at,ends_at,hotel_required,vehicle_required,flight_required,status,completed_at,route_distance_km,route_duration_minutes,route_calculated_at,
       trip_appointments(
         sort_order,
-        appointments(id,demand_id,responsible_user_id,title,farm_name_snapshot,city_snapshot,state_snapshot,starts_at,ends_at,appointment_type,client_confirmed)
+        appointments(id,demand_id,responsible_user_id,title,farm_name_snapshot,city_snapshot,state_snapshot,starts_at,ends_at,all_day,start_time,end_time,appointment_type,client_confirmed)
       ),
       lodging_reservations(
         id,hotel_id,check_in,check_out,price_mode,daily_value,total_value,reservation_code,confirmed,notes,
@@ -337,6 +341,9 @@ export async function getTrips(workspaceId: string): Promise<Trip[]> {
           state: a.state_snapshot || undefined,
           start: a.starts_at,
           end: a.ends_at,
+          allDay: a.all_day !== false,
+          startTime: a.start_time ? String(a.start_time).slice(0, 5) : undefined,
+          endTime: a.end_time ? String(a.end_time).slice(0, 5) : undefined,
           type: a.appointment_type === 'presencial' ? 'Presencial' : a.appointment_type === 'remoto' ? 'Remoto' : 'A definir',
           responsible: a.responsible_user_id || undefined,
         }
@@ -492,6 +499,7 @@ export async function checkAppointmentConflicts(
   userId: string,
   start: string,
   end: string,
+  timing: AppointmentTimingInput,
   excludeAppointmentId?: string,
 ): Promise<import('../types/routine').AppointmentConflict[]> {
   const client = requireClient()
@@ -499,10 +507,23 @@ export async function checkAppointmentConflicts(
     target_user: userId,
     target_start: start,
     target_end: end,
+    target_all_day: timing.allDay,
+    target_start_time: timing.allDay ? null : timing.startTime || null,
+    target_end_time: timing.allDay ? null : timing.endTime || null,
+    target_type: timing.type === 'Presencial' ? 'presencial' : 'remoto',
     exclude_appointment: excludeAppointmentId || null,
   })
   if (error) throw error
-  return (data ?? []).map((row: any) => ({ id: row.id, title: row.title, start: row.starts_at, end: row.ends_at }))
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    title: row.title,
+    start: row.starts_at,
+    end: row.ends_at,
+    allDay: row.all_day !== false,
+    startTime: row.start_time ? String(row.start_time).slice(0, 5) : undefined,
+    endTime: row.end_time ? String(row.end_time).slice(0, 5) : undefined,
+    type: row.appointment_type === 'presencial' ? 'Presencial' : row.appointment_type === 'remoto' ? 'Remoto' : 'A definir',
+  }))
 }
 
 export async function createAppointmentFromDemand(
@@ -525,9 +546,12 @@ export async function createAppointmentFromDemand(
       appointment_type: appointmentType,
       starts_at: input.start,
       ends_at: input.end,
+      all_day: input.allDay,
+      start_time: input.allDay ? null : input.startTime || null,
+      end_time: input.allDay ? null : input.endTime || null,
       client_confirmed: input.clientConfirmed,
     })
-    .select('id,demand_id,title,farm_name_snapshot,city_snapshot,state_snapshot,starts_at,ends_at,appointment_type,client_confirmed')
+    .select('id,demand_id,title,farm_name_snapshot,city_snapshot,state_snapshot,starts_at,ends_at,all_day,start_time,end_time,appointment_type,client_confirmed')
     .single()
   if (error) throw error
 
@@ -548,6 +572,9 @@ export async function createAppointmentFromDemand(
     state: data.state_snapshot || undefined,
     start: data.starts_at,
     end: data.ends_at,
+    allDay: data.all_day !== false,
+    startTime: data.start_time ? String(data.start_time).slice(0, 5) : undefined,
+    endTime: data.end_time ? String(data.end_time).slice(0, 5) : undefined,
     type: data.appointment_type === 'presencial' ? 'Presencial' : 'Remoto',
     responsible: user.id,
   }
@@ -819,6 +846,9 @@ export async function updateAppointment(
     .update({
       starts_at: input.start,
       ends_at: input.end,
+      all_day: input.allDay,
+      start_time: input.allDay ? null : input.startTime || null,
+      end_time: input.allDay ? null : input.endTime || null,
       appointment_type: appointmentType,
       client_confirmed: input.clientConfirmed,
       farm_name_snapshot: input.farmName?.trim() || null,
@@ -827,7 +857,7 @@ export async function updateAppointment(
     })
     .eq('workspace_id', workspaceId)
     .eq('id', input.appointmentId)
-    .select('id,demand_id,title,farm_name_snapshot,city_snapshot,state_snapshot,starts_at,ends_at,appointment_type,client_confirmed')
+    .select('id,demand_id,title,farm_name_snapshot,city_snapshot,state_snapshot,starts_at,ends_at,all_day,start_time,end_time,appointment_type,client_confirmed')
     .single()
   if (error) throw error
 
@@ -879,6 +909,9 @@ export async function updateAppointment(
     state: data.state_snapshot || undefined,
     start: data.starts_at,
     end: data.ends_at,
+    allDay: data.all_day !== false,
+    startTime: data.start_time ? String(data.start_time).slice(0, 5) : undefined,
+    endTime: data.end_time ? String(data.end_time).slice(0, 5) : undefined,
     type: data.appointment_type === 'presencial' ? 'Presencial' : 'Remoto',
     responsible: user.id,
   }
@@ -889,22 +922,18 @@ export async function updateTrip(
   input: import('../types/routine').UpdateTripInput,
 ): Promise<void> {
   const client = requireClient()
-  const { error } = await client
-    .from('trips')
-    .update({
-      title: input.title.trim(),
-      origin: input.origin?.trim() || null,
-      starts_at: input.start,
-      ends_at: input.end,
-      hotel_required: input.hotelRequired,
-      vehicle_required: input.vehicleRequired,
-      flight_required: input.flightRequired,
-      route_distance_km: null,
-      route_duration_minutes: null,
-      route_calculated_at: null,
-    })
-    .eq('workspace_id', workspaceId)
-    .eq('id', input.tripId)
+  const { error } = await client.rpc('update_trip_with_schedule', {
+    target_workspace: workspaceId,
+    target_trip: input.tripId,
+    target_title: input.title.trim(),
+    target_origin: input.origin?.trim() || null,
+    target_start: input.start,
+    target_end: input.end,
+    target_hotel_required: input.hotelRequired,
+    target_vehicle_required: input.vehicleRequired,
+    target_flight_required: input.flightRequired,
+    sync_appointments: input.syncAppointments,
+  })
   if (error) throw error
 }
 
@@ -1099,7 +1128,7 @@ export async function saveVehicleReservation(
     pickup_location: input.pickupLocation?.trim() || null,
     notes: input.notes?.trim() || null,
     requested_at: ['requested','confirmed','picked_up','returned'].includes(input.status) ? new Date().toISOString() : null,
-    form_url: 'https://forms.cloud.microsoft/pages/responsepage.aspx?id=ovpYBG4dE0iA1wsCfIUhBVYJmZgr6BZPihez6CAuhL9UNVZDUUEzQ0xCQ1NWNUdVRTBWRzRRQ0VENy4u&route=shorturl',
+    form_url: input.company === 'Veículo da empresa' ? null : 'https://forms.cloud.microsoft/pages/responsepage.aspx?id=ovpYBG4dE0iA1wsCfIUhBVYJmZgr6BZPihez6CAuhL9UNVZDUUEzQ0xCQ1NWNUdVRTBWRzRRQ0VENy4u&route=shorturl',
   }
 
   if (input.reservationId) {

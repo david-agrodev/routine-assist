@@ -31,6 +31,9 @@ export type Appointment = {
   clientConfirmed?: boolean
   start: string
   end: string
+  allDay: boolean
+  startTime?: string
+  endTime?: string
   type: 'Presencial' | 'Remoto' | 'A definir'
   responsible?: string
 }
@@ -66,7 +69,7 @@ export type Lodging = {
 export type VehicleReservation = {
   id: string
   status: 'not_required' | 'not_requested' | 'requested' | 'confirmed' | 'picked_up' | 'returned'
-  company?: 'Localiza' | 'Unidas'
+  company?: 'Localiza' | 'Unidas' | 'Veículo da empresa'
   locator?: string
   requestedAt?: string
   pickupAt?: string
@@ -238,6 +241,17 @@ export type AppointmentConflict = {
   title: string
   start: string
   end: string
+  allDay: boolean
+  startTime?: string
+  endTime?: string
+  type: 'Presencial' | 'Remoto' | 'A definir'
+}
+
+export type AppointmentTimingInput = {
+  allDay: boolean
+  startTime?: string
+  endTime?: string
+  type: 'Presencial' | 'Remoto'
 }
 
 export type CreateAppointmentInput = {
@@ -248,6 +262,9 @@ export type CreateAppointmentInput = {
   farmName?: string
   start: string
   end: string
+  allDay: boolean
+  startTime?: string
+  endTime?: string
   type: 'Presencial' | 'Remoto'
   clientConfirmed: boolean
 }
@@ -286,7 +303,7 @@ export type SaveVehicleInput = {
   tripId: string
   reservationId?: string
   status: VehicleReservation['status']
-  company?: 'Localiza' | 'Unidas'
+  company?: 'Localiza' | 'Unidas' | 'Veículo da empresa'
   locator?: string
   pickupAt?: string
   returnAt?: string
@@ -319,6 +336,9 @@ export type UpdateAppointmentInput = {
   demandId?: string
   start: string
   end: string
+  allDay: boolean
+  startTime?: string
+  endTime?: string
   type: 'Presencial' | 'Remoto'
   clientConfirmed: boolean
   farmName?: string
@@ -335,6 +355,7 @@ export type UpdateTripInput = {
   hotelRequired: boolean
   vehicleRequired: boolean
   flightRequired: boolean
+  syncAppointments: boolean
 }
 
 export type SaveTripRouteInput = {

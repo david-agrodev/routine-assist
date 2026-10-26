@@ -41,3 +41,10 @@ export const PlaneIcon = (p:P) => <svg {...base} {...p}><path d="M3.5 13.5 20 6.
 export const SendIcon = (p:P) => <svg {...base} {...p}><path d="M3.5 12 20 4.8 16 20l-4.4-6.1L5.8 16Z"/><path d="m11.6 13.9 3.2-3.7"/></svg>
 export const MailIcon = (p:P) => <svg {...base} {...p}><rect x="3.5" y="5.5" width="17" height="13" rx="2.2"/><path d="m5 8 7 5 7-5"/></svg>
 export const UserIcon = (p:P) => <svg {...base} {...p}><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg>
+export const TodayIcon = (p:P) => <svg {...base} {...p}><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3.5v3M16 3.5v3M3.5 9h17"/><path d="M8 13h3v3H8z" fill="currentColor" stroke="none"/><path d="M14 13h2M14 16h2"/></svg>
+export const JourneyIcon = (p:P) => <svg {...base} {...p}><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M9 7V5h6v2M8 11v4M16 11v4M4 12h16"/><circle cx="8" cy="21" r=".7" fill="currentColor" stroke="none"/><circle cx="16" cy="21" r=".7" fill="currentColor" stroke="none"/></svg>
+export const DemandIcon = (p:P) => <svg {...base} {...p}><path d="M7 5.5h10A2.5 2.5 0 0 1 19.5 8v10A2.5 2.5 0 0 1 17 20.5H7A2.5 2.5 0 0 1 4.5 18V8A2.5 2.5 0 0 1 7 5.5Z"/><path d="M9 5.5V4h6v1.5M8 10h8M8 14h4"/><path d="m14 16 1.3 1.3L18 14.5"/></svg>
+export const FarmIcon = (p:P) => <svg {...base} {...p}><path d="m3.5 10 8.5-6 8.5 6M5.5 9v11h13V9"/><path d="M9 20v-6h6v6M8 11h2M14 11h2"/><path d="M3 20h18"/></svg>
+export const CollarIcon = (p:P) => <svg {...base} {...p}><path d="M5 7.5c4.5 2 9.5 2 14 0l-1 7.8a3 3 0 0 1-3 2.7H9a3 3 0 0 1-3-2.7Z"/><path d="M8 9v3M16 9v3"/><circle cx="12" cy="14.5" r="1.5"/></svg>
+export const NotesIcon = (p:P) => <svg {...base} {...p}><path d="M6 3.5h9l3 3V20H6Z"/><path d="M15 3.5V7h3M9 11h6M9 14.5h6M9 18h3"/></svg>
+export const SaveIcon = (p:P) => <svg {...base} {...p}><path d="M5 4h12l2 2v14H5Z"/><path d="M8 4v6h8V4M8 20v-6h8v6"/></svg>

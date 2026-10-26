@@ -1,7 +1,7 @@
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { CalendarIcon, CarIcon, CheckIcon, HotelIcon, LocationIcon, PlaneIcon, RouteIcon } from './Icons'
-import { formatDateRange } from '../lib/format'
+import { formatDateRange, formatScheduleTime } from '../lib/format'
 import { isFlightReady, isHotelReady, isVehicleReady } from '../lib/tripReadiness'
 import { appointmentCompanyKey, companyClass, companyLabel, tripCompanyKey } from '../lib/company'
 import { compactTripCommercials, holidayForDate } from '../lib/calendar'
@@ -81,7 +81,7 @@ export function AgendaSummaryModal({
             <div className="grow">
               <div className="summary-title-line"><span className="company-badge">{companyLabel(key)}</span><span className="eyebrow">Atendimento sem viagem</span></div>
               <h3>{appointment.farmName || appointment.client}</h3>
-              <p>{appointment.farmName ? `${appointment.client} • ` : ''}{formatDateRange(appointment.start, appointment.end)} • {appointment.type}</p>
+              <p>{appointment.farmName ? `${appointment.client} • ` : ''}{formatDateRange(appointment.start, appointment.end)} • {formatScheduleTime(appointment)} • {appointment.type}</p>
               {(appointment.city || appointment.state) && <p className="summary-location"><LocationIcon/> {[appointment.city, appointment.state].filter(Boolean).join('/')}</p>}
             </div>
             {demand && <button className="secondary compact summary-open" onClick={() => onOpenDemand(demand)}>Abrir demanda</button>}

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { BrandMark } from '../components/BrandMark'
 import { useRoutine } from '../context/RoutineContext'
 import { usePwaInstall } from '../hooks/usePwaInstall'
+import { pushNotificationsConfigured, subscribeToPushNotifications, unsubscribeFromPushNotifications } from '../services/pushNotifications'
 
 const options=[14,7,3,1]
 
@@ -31,13 +32,23 @@ export function SettingsPage(){
   },[userProfile,user])
 
   const requestNotifications = async () => {
-    if (!('Notification' in window)) { setMessage('Este navegador não oferece notificações web.'); return }
-    const permission = await Notification.requestPermission()
-    if (permission === 'granted') {
+    if (!user) return
+    setSaving(true); setMessage('')
+    try {
+      const subscription = await subscribeToPushNotifications(user.id)
       setPush(true)
-      new Notification('Routine Assist', { body: 'Avisos do dispositivo ativados.', icon:'/icon-192.png' })
-      setMessage('Permissão concedida. Salve as preferências para manter ativado.')
-    } else setMessage('A permissão não foi concedida pelo navegador.')
+      const registration = await navigator.serviceWorker.ready
+      await registration.showNotification('Routine Assist', { body: 'Este aparelho está pronto para receber alertas.', icon:'/icon-192.png', data:'/' })
+      setMessage(subscription.endpoint ? 'Aparelho registrado. Salve as preferências para ativar os alertas automáticos.' : 'Aparelho registrado.')
+    } catch (error:any) { setMessage(error?.message || 'Não foi possível ativar as notificações neste aparelho.') }
+    finally { setSaving(false) }
+  }
+
+  const disableNotifications = async () => {
+    setSaving(true); setMessage('')
+    try { await unsubscribeFromPushNotifications(); setPush(false); setMessage('Notificações desativadas neste aparelho. Salve as preferências.') }
+    catch(error:any){ setMessage(error?.message || 'Não foi possível desativar as notificações.') }
+    finally { setSaving(false) }
   }
 
   const toggleDay=(day:number)=>setAlertDays(days=>days.includes(day)?days.filter(d=>d!==day):[...days,day].sort((a,b)=>b-a))
@@ -66,9 +77,9 @@ export function SettingsPage(){
         <div className="alert-day-picker">{options.map(day=><button type="button" className={alertDays.includes(day)?'active':''} onClick={()=>toggleDay(day)} key={day}><span>{alertDays.includes(day)&&<CheckIcon/>}</span>{day} {day===1?'dia':'dias'} antes</button>)}</div>
       </section>
 
-      <section className="panel setting-card"><div className="setting-title"><BellIcon/><div><h2>Notificações do dispositivo</h2><p>Avisos do navegador/PWA quando o Routine estiver ativo.</p></div></div>
-        <div className="preference-toggle-row"><span><strong>Ativar avisos</strong><small>{typeof window!=='undefined' && 'Notification' in window ? `Permissão: ${Notification.permission}` : 'Não suportado'}</small></span><input type="checkbox" checked={push} onChange={e=>setPush(e.target.checked)}/></div>
-        <button className="secondary" onClick={()=>void requestNotifications()}>Solicitar permissão do navegador</button>
+      <section className="panel setting-card"><div className="setting-title"><BellIcon/><div><h2>Notificações do dispositivo</h2><p>Alertas na barra do celular, inclusive com o PWA fechado.</p></div></div>
+        <div className="preference-toggle-row"><span><strong>Ativar avisos</strong><small>{!pushNotificationsConfigured?'Configuração do servidor pendente':typeof window!=='undefined' && 'Notification' in window ? `Permissão: ${Notification.permission}` : 'Não suportado'}</small></span><input type="checkbox" checked={push} disabled={saving} onChange={e=>void(e.target.checked?requestNotifications():disableNotifications())}/></div>
+        <button className="secondary" disabled={saving||!pushNotificationsConfigured} onClick={()=>void requestNotifications()}>{saving?'Configurando...':push?'Registrar novamente este aparelho':'Ativar neste aparelho'}</button>
       </section>
 
       <section className="panel setting-card setting-wide"><div className="setting-title"><BrandMark className="settings-brand-mark"/><div><h2>Instalar Routine Assist</h2><p>Use o sistema como aplicativo no celular ou no computador.</p></div></div>

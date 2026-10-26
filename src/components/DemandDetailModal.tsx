@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertIcon, BuildingIcon, CalendarIcon, CheckIcon, EditIcon, LocationIcon, PlusIcon, SendIcon, TrashIcon } from './Icons'
+import { AlertIcon, BuildingIcon, CalendarIcon, CheckIcon, ClockIcon, EditIcon, LocationIcon, PlusIcon, SendIcon, TrashIcon } from './Icons'
 import { LocationFields } from './LocationFields'
+import { DateRangePicker } from './DateRangePicker'
 import { TravelSetupPanel } from './TravelSetupPanel'
 import { ConfirmActionModal } from './ConfirmActionModal'
 import { PriorityStars } from './PriorityStars'
@@ -29,6 +30,9 @@ type Draft = {
   raw: string
   start: string
   end: string
+  allDay: boolean
+  startTime: string
+  endTime: string
   type: 'Presencial'|'Remoto'
   confirmed: boolean
 }
@@ -49,6 +53,9 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
   const [raw, setRaw] = useState('')
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
+  const [allDay, setAllDay] = useState(true)
+  const [startTime, setStartTime] = useState('09:00')
+  const [endTime, setEndTime] = useState('10:00')
   const [type, setType] = useState<'Presencial'|'Remoto'>('Presencial')
   const [confirmed, setConfirmed] = useState(false)
   const [editingAppointment, setEditingAppointment] = useState(false)
@@ -96,6 +103,9 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
     setRaw(draft?.raw ?? demand.raw ?? '')
     setStart(draft?.start ?? existingAppointment?.start ?? '')
     setEnd(draft?.end ?? existingAppointment?.end ?? '')
+    setAllDay(draft?.allDay ?? existingAppointment?.allDay ?? true)
+    setStartTime(draft?.startTime ?? existingAppointment?.startTime ?? '09:00')
+    setEndTime(draft?.endTime ?? existingAppointment?.endTime ?? '10:00')
     setType(draft?.type ?? (existingAppointment?.type === 'Remoto' ? 'Remoto' : 'Presencial'))
     setConfirmed(draft?.confirmed ?? Boolean(existingAppointment?.clientConfirmed ?? existingAppointment))
     setConflicts([]); setChecked(false); setError(null); setCreatedAppointment(null); setDeleteOpen(false); setCancelAppointmentOpen(false); setCancelAppointmentError(null); setCancelDemandOpen(false); setCancelDemandError(null); setControlTechOpen(false); setControlTechError(null); setControlTechSuccess(null); setEditingAppointment(false)
@@ -105,9 +115,9 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
 
   useEffect(() => {
     if (!demand || initializedFor.current !== demand.id || appointment) return
-    const draft: Draft = { tab, client, company, regional, priority, farmName, city, state, quantity, extraAntennaCount, showExtraAntenna, raw, start, end, type, confirmed }
+    const draft: Draft = { tab, client, company, regional, priority, farmName, city, state, quantity, extraAntennaCount, showExtraAntenna, raw, start, end, allDay, startTime, endTime, type, confirmed }
     try { window.localStorage.setItem(draftKey(demand.id), JSON.stringify(draft)) } catch { /* persistência opcional */ }
-  }, [demand, appointment, tab, client, company, regional, priority, farmName, city, state, quantity, extraAntennaCount, showExtraAntenna, raw, start, end, type, confirmed])
+  }, [demand, appointment, tab, client, company, regional, priority, farmName, city, state, quantity, extraAntennaCount, showExtraAntenna, raw, start, end, allDay, startTime, endTime, type, confirmed])
 
   if (!demand) return null
 
@@ -259,6 +269,8 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
     if (!client.trim() || !city.trim() || !state.trim() || !start || !end) return 'Informe cidade e UF na aba Informações e preencha o período antes de agendar.'
     if (type === 'Presencial' && !farmName.trim()) return 'Informe o nome da fazenda na aba Informações antes de agendar um atendimento presencial.'
     if (end < start) return 'A data final não pode ser anterior à data inicial.'
+    if (!allDay && (!startTime || !endTime)) return 'Informe os horários de início e fim do atendimento.'
+    if (!allDay && start === end && endTime <= startTime) return 'O horário final deve ser posterior ao horário inicial.'
     if (!confirmed) return 'Confirme que a data já foi combinada com o cliente.'
     if (linkedTrip && type === 'Remoto') return 'Este atendimento está vinculado a uma viagem. Exclua/desvincule a viagem antes de mudar o atendimento para remoto.'
     return null
@@ -286,7 +298,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
     setBusy(true)
     try {
       await updateDemand(demand.id, payload('contact', 'Data confirmada; verificar agenda'))
-      const found = await checkAppointmentConflicts(start, end)
+      const found = await checkAppointmentConflicts(start, end, { allDay, startTime, endTime, type })
       setConflicts(found); setChecked(true)
       if (found.length === 0) await continueAfterAvailability('create')
     } catch (e:any) { setError(e?.message || 'Não foi possível verificar a agenda.') }
@@ -305,6 +317,9 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
         farmName: farmName.trim() || undefined,
         start,
         end,
+        allDay,
+        startTime: allDay ? undefined : startTime,
+        endTime: allDay ? undefined : endTime,
         type,
         clientConfirmed: confirmed,
       })
@@ -318,7 +333,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
 
   const beginAppointmentEdit = () => {
     if (!appointment) return
-    setStart(appointment.start); setEnd(appointment.end); setType(appointment.type === 'Remoto' ? 'Remoto' : 'Presencial')
+    setStart(appointment.start); setEnd(appointment.end); setAllDay(appointment.allDay); setStartTime(appointment.startTime || '09:00'); setEndTime(appointment.endTime || '10:00'); setType(appointment.type === 'Remoto' ? 'Remoto' : 'Presencial')
     setConfirmed(Boolean(appointment.clientConfirmed ?? true)); setConflicts([]); setChecked(false); setError(null); setEditingAppointment(true)
   }
 
@@ -329,7 +344,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
     if (validation) { setError(validation); return }
     setBusy(true)
     try {
-      const found = await checkAppointmentConflicts(start, end, appointment.id)
+      const found = await checkAppointmentConflicts(start, end, { allDay, startTime, endTime, type }, appointment.id)
       setConflicts(found); setChecked(true)
       if (found.length === 0) await continueAfterAvailability('edit')
     } catch(e:any){ setError(e?.message || 'Não foi possível verificar a agenda.') }
@@ -344,7 +359,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
       const updated = await updateAppointment({
         appointmentId: appointment.id,
         demandId: demand.id,
-        start,end,type,clientConfirmed:confirmed,
+        start,end,allDay,startTime:allDay?undefined:startTime,endTime:allDay?undefined:endTime,type,clientConfirmed:confirmed,
         farmName:farmName.trim() || undefined,
         city:city.trim() || undefined,
         state:state.trim().toUpperCase() || undefined,
@@ -373,15 +388,22 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
       <button className="secondary mini" onClick={()=>setTab('info')}>{infoComplete?'Alterar informações':'Preencher local'}</button>
     </div>
     {type==='Presencial' && !farmName.trim() && <div className="soft-note"><AlertIcon/> Para atendimento presencial, informe o nome da fazenda na aba Informações.</div>}
-    <div className="form-grid schedule-grid schedule-grid-no-location">
-      <label className="field"><span>Tipo *</span><select value={type} onChange={e=>setType(e.target.value as 'Presencial'|'Remoto')}><option>Presencial</option><option>Remoto</option></select></label>
-      <label className="field"><span>Data inicial *</span><input type="date" value={start} onChange={e=>{setStart(e.target.value);setChecked(false);setConflicts([])}}/></label>
-      <label className="field"><span>Data final *</span><input type="date" value={end} onChange={e=>{setEnd(e.target.value);setChecked(false);setConflicts([])}}/></label>
+    <div className="form-grid schedule-grid schedule-grid-timing">
+      <label className="field"><span>Tipo *</span><select value={type} onChange={e=>{setType(e.target.value as 'Presencial'|'Remoto');setChecked(false);setConflicts([])}}><option>Presencial</option><option>Remoto</option></select></label>
+      <DateRangePicker start={start} end={end} required onChange={(nextStart,nextEnd)=>{setStart(nextStart);setEnd(nextEnd);setChecked(false);setConflicts([])}}/>
+    </div>
+    <div className="appointment-time-panel">
+      <label className="all-day-toggle"><input type="checkbox" checked={allDay} onChange={e=>{setAllDay(e.target.checked);setChecked(false);setConflicts([])}}/><span><strong>O dia todo</strong><small>Desmarque para reservar um horário específico.</small></span></label>
+      {!allDay && <div className="appointment-time-fields">
+        <label className="field"><span><ClockIcon/> Início *</span><input type="time" value={startTime} onChange={e=>{setStartTime(e.target.value);setChecked(false);setConflicts([])}}/></label>
+        <label className="field"><span><ClockIcon/> Fim *</span><input type="time" value={endTime} onChange={e=>{setEndTime(e.target.value);setChecked(false);setConflicts([])}}/></label>
+      </div>}
+      {!allDay && type==='Remoto' && <div className="remote-slot-note"><ClockIcon/><span>Este atendimento remoto poderá coexistir com uma instalação de dia inteiro, desde que não haja outro compromisso no mesmo horário.</span></div>}
     </div>
     <label className="confirm-row"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/><span><strong>Data confirmada com o cliente</strong><small>O Routine só salva o compromisso depois desta confirmação.</small></span></label>
     {isEdit && linkedTrip && <div className="soft-note"><EditIcon/> Se o novo período ultrapassar a viagem, o Routine amplia a viagem automaticamente. Para encurtar saída/retorno, edite a viagem depois.</div>}
     {!isEdit && <div className="draft-note">Data e opções ficam salvas mesmo se você fechar a demanda e voltar depois.</div>}
-    {conflicts.length>0 && <div className="conflict-box hard-block"><div className="conflict-title"><AlertIcon/><div><strong>Período indisponível</strong><span>Já existe atendimento neste período. O Routine não permite sobreposição de agenda.</span></div></div>{conflicts.map(c=><div className="conflict-row" key={c.id}><strong>{c.title}</strong><span>{formatDateRange(c.start,c.end)}</span></div>)}</div>}
+    {conflicts.length>0 && <div className="conflict-box hard-block"><div className="conflict-title"><AlertIcon/><div><strong>Período indisponível</strong><span>Já existe atendimento neste período. O Routine não permite sobreposição de agenda.</span></div></div>{conflicts.map(c=><div className="conflict-row" key={c.id}><strong>{c.title}</strong><span>{formatDateRange(c.start,c.end)}{!c.allDay&&c.startTime&&c.endTime?` • ${c.startTime}–${c.endTime}`:' • dia todo'}</span></div>)}</div>}
     {checked && conflicts.length===0 && <div className="auth-message success"><CheckIcon/> Agenda disponível.</div>}
     {error && <div className="auth-message error modal-error">{error}</div>}
     <div className="modal-actions">
@@ -447,7 +469,7 @@ export function DemandDetailModal({ demand, onClose, initialTab }: { demand: Dem
           {appointment && !editingAppointment ? <>
             <div className="scheduled-summary">
               <span className="section-icon neutral"><CheckIcon/></span>
-              <div className="grow"><span className="eyebrow">Atendimento agendado</span><h3>{appointment.farmName || appointment.client}</h3><p>{appointment.client}{appointment.farmName ? ' • ' : ''}{[appointment.city,appointment.state].filter(Boolean).join('/')} • {formatDateRange(appointment.start,appointment.end)} • {appointment.type}</p></div>
+              <div className="grow"><span className="eyebrow">Atendimento agendado</span><h3>{appointment.farmName || appointment.client}</h3><p>{appointment.client}{appointment.farmName ? ' • ' : ''}{[appointment.city,appointment.state].filter(Boolean).join('/')} • {formatDateRange(appointment.start,appointment.end)} • {appointment.allDay?'Dia todo':`${appointment.startTime}–${appointment.endTime}`} • {appointment.type}</p></div>
               <div className="scheduled-summary-actions"><button className="secondary compact" onClick={beginAppointmentEdit}><EditIcon/> Editar agendamento</button><button className="danger-soft compact" onClick={()=>{setCancelAppointmentError(null);setCancelAppointmentOpen(true)}}><TrashIcon/> Cancelar atendimento</button></div>
             </div>
             {appointment.type === 'Presencial' ? <TravelSetupPanel appointment={appointment} onFinish={onClose}/> : <div className="remote-success"><CheckIcon/><div><strong>Pronto.</strong><span>Como o atendimento é remoto, não é necessário criar viagem, hotel ou veículo.</span></div></div>}

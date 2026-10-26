@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { CalendarIcon, CheckIcon, LocationIcon, PlaneIcon, RouteIcon } from './Icons'
 import { useRoutine } from '../context/RoutineContext'
 import { LocationFields } from './LocationFields'
+import { DateRangePicker } from './DateRangePicker'
 import { locationLabel, parseLocationLabel } from '../lib/location'
 import { suggestedTripTitle } from '../lib/tripTitle'
 
@@ -94,14 +95,13 @@ export function CreateTripModal({ open, onClose }: { open: boolean; onClose: () 
         <div className="departure-location-box"><div className="departure-location-title"><LocationIcon/><div><strong>Ponto de partida</strong><small>É de onde você inicia e onde começa a rota terrestre até a última parada.</small></div></div><div className="form-grid departure-location-grid"><LocationFields city={departureCity} state={departureState} onCityChange={setDepartureCity} onStateChange={setDepartureState} required/></div></div>
         <div className="form-grid trip-form-grid">
           <label className="field field-wide"><span>Nome da viagem *</span><input value={title} onChange={e=>{setTitle(e.target.value);setTitleTouched(true)}} placeholder={chosen.length?suggestedTripTitle(chosen):'Ex.: Goiás • Setembro'}/><small className="field-inline-hint">O Routine sugere o nome conforme os destinos. Você pode personalizar.</small></label>
-          <label className="field"><span>Saída *</span><input type="date" value={start} onChange={e=>setStart(e.target.value)}/></label>
-          <label className="field"><span>Retorno *</span><input type="date" value={end} onChange={e=>setEnd(e.target.value)}/></label>
+          <DateRangePicker start={start} end={end} label="Período da viagem" required onChange={(nextStart,nextEnd)=>{setStart(nextStart);setEnd(nextEnd)}}/>
         </div>
       </div>
 
       <div className="travel-options">
         <label className="confirm-row"><input type="checkbox" checked={hotelRequired} onChange={e=>setHotelRequired(e.target.checked)}/><span><strong>Precisa de hotel</strong><small>O Routine vai alertar antes da viagem enquanto não houver reserva confirmada.</small></span></label>
-        <label className="confirm-row"><input type="checkbox" checked={vehicleRequired} onChange={e=>setVehicleRequired(e.target.checked)}/><span><strong>Precisa de veículo</strong><small>O Routine vai acompanhar o envio do Forms e a confirmação da locadora.</small></span></label>
+        <label className="confirm-row"><input type="checkbox" checked={vehicleRequired} onChange={e=>setVehicleRequired(e.target.checked)}/><span><strong>Precisa de veículo</strong><small>Escolha depois entre locadora ou veículo da empresa.</small></span></label>
         <label className="confirm-row"><input type="checkbox" checked={flightRequired} onChange={e=>setFlightRequired(e.target.checked)}/><span><strong><PlaneIcon/> Precisa de passagem aérea</strong><small>O Routine vai montar o e-mail para o Outlook e acompanhar a confirmação do voo.</small></span></label>
       </div>
       <div className="draft-note">A viagem também fica salva como rascunho se você sair desta tela.</div>

@@ -37,6 +37,7 @@ import type {
   AddLodgingInput,
   Appointment,
   AppointmentConflict,
+  AppointmentTimingInput,
   Company,
   ControlTechIntegrationRequest,
   CreateControlTechIntegrationRequestInput,
@@ -79,7 +80,7 @@ type RoutineContextValue = {
   deleteTrip: (tripId: string) => Promise<void>
   completeTrip: (tripId: string) => Promise<void>
   cancelAppointment: (appointmentId: string, demandId?: string) => Promise<void>
-  checkAppointmentConflicts: (start: string, end: string, excludeAppointmentId?: string) => Promise<AppointmentConflict[]>
+  checkAppointmentConflicts: (start: string, end: string, timing: AppointmentTimingInput, excludeAppointmentId?: string) => Promise<AppointmentConflict[]>
   scheduleDemand: (input: CreateAppointmentInput) => Promise<Appointment>
   updateAppointment: (input: UpdateAppointmentInput) => Promise<Appointment>
   createTrip: (input: CreateTripInput) => Promise<string>
@@ -210,14 +211,14 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
     await refresh()
   }
 
-  const checkAppointmentConflicts = async (start: string, end: string, excludeAppointmentId?: string) => {
+  const checkAppointmentConflicts = async (start: string, end: string, timing: AppointmentTimingInput, excludeAppointmentId?: string) => {
     if (!user) throw new Error('Usuário indisponível.')
-    return checkAppointmentConflictsDb(user.id, start, end, excludeAppointmentId)
+    return checkAppointmentConflictsDb(user.id, start, end, timing, excludeAppointmentId)
   }
 
   const scheduleDemand = async (input: CreateAppointmentInput) => {
     if (!workspaceId || !user) throw new Error('Usuário/workspace indisponível.')
-    const conflicts = await checkAppointmentConflictsDb(user.id, input.start, input.end)
+    const conflicts = await checkAppointmentConflictsDb(user.id, input.start, input.end, input)
     if (conflicts.length) throw new Error('Período indisponível: já existe outro atendimento nas datas selecionadas.')
     const appointment = await createAppointmentFromDemand(workspaceId, user, input)
     setAppointments(current => [...current, appointment].sort((a,b) => a.start.localeCompare(b.start)))
@@ -227,7 +228,7 @@ export function RoutineProvider({ children }: { children: React.ReactNode }) {
 
   const updateAppointment = async (input: UpdateAppointmentInput) => {
     if (!workspaceId || !user) throw new Error('Usuário/workspace indisponível.')
-    const conflicts = await checkAppointmentConflictsDb(user.id, input.start, input.end, input.appointmentId)
+    const conflicts = await checkAppointmentConflictsDb(user.id, input.start, input.end, input, input.appointmentId)
     if (conflicts.length) throw new Error('Período indisponível: já existe outro atendimento nas datas selecionadas.')
     const updated = await updateAppointmentDb(workspaceId, user, input)
     setAppointments(current => current.map(a => a.id === updated.id ? updated : a).sort((a,b) => a.start.localeCompare(b.start)))

@@ -18,7 +18,7 @@ const DEFAULT_DAYS = [14,7,3,1]
 const daysUntil = (isoDate: string) => differenceInCalendarDays(parseISO(isoDate), startOfDay(new Date()))
 
 function activeStage(days: number, alertDays: number[]) {
-  const sorted = [...new Set(alertDays.filter(n=>n>=0))].sort((a,b)=>b-a)
+  const sorted = [...new Set(alertDays.filter(n=>n>=0))].sort((a,b)=>a-b)
   return sorted.find(threshold => days <= threshold)
 }
 
